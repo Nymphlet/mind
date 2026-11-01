@@ -91,17 +91,17 @@ param cycle.withdrawal_sens = 0.40 [label="Luteal withdrawal sensitivity", min=0
 param cycle.tracked_day = -1       [label="Externally tracked cycle day (-1=off)", min=-1, max=35, step=1, description="PLACEHOLDER external trigger: user-tracked cycle day (future daemon/HTTP feed). When >= 0, cycle.day syncs gently toward it."]
 param cycle.lh_strip = -1          [label="External LH strip level (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external trigger: urinary LH predictor kit reading (future ingest feed). When >= 0 it drives the LH surge leaf from outside."]
 param lust.gate = 1.0              [label="Intimacy master gate", min=0, max=2, step=0.05, description="Top-level multiplier on latent romantic/erotic desire (0 disables intimacy)."]
-param lust.salience_base = 0.16    [label="Romantic salience setpoint", min=0, max=1, step=0.05, description="Resting baseline for dopaminergic romantic/erotic wanting."]
-param lust.receptivity_base = 0.26 [label="Intimate receptivity setpoint", min=0, max=1, step=0.05, description="Resting baseline for affiliative openness to intimacy."]
-param lust.cuddle_base = 0.20      [label="Evening cuddle & affection base", min=0, max=1, step=0.05, description="Baseline appetite for soft, low-arousal evening closeness and cuddliness."]
-param lust.inh_base = 0.26         [label="Intimacy inhibition brake", min=0, max=1, step=0.05, description="Resting contextual brake on romantic/erotic expression."]
+param lust.salience_base = 0.10    [label="Romantic salience setpoint (base)", min=0, max=1, step=0.05, description="Structural resting baseline for dopaminergic romantic/erotic wanting (personality lives in traits). NOTE: trait nympho adds +0.30*value (default 0.20 -> effective 0.16), flirtatious_spark +0.35*value, modesty_brake -0.15*value."]
+param lust.receptivity_base = 0.20 [label="Intimate receptivity setpoint (base)", min=0, max=1, step=0.05, description="Structural resting baseline for affiliative openness to intimacy. NOTE: trait receiver adds +0.30*value (default 0.20 -> effective 0.26)."]
+param lust.cuddle_base = 0.15      [label="Evening cuddle & affection base", min=0, max=1, step=0.05, description="Structural baseline appetite for soft, low-arousal evening closeness and cuddliness. NOTE: trait cozy_cuddliness adds +0.55*value (default 0.25 -> effective 0.2875)."]
+param lust.inh_base = 0.26         [label="Intimacy inhibition brake", min=0, max=1, step=0.05, description="Structural resting contextual brake on romantic/erotic expression (no personality at base). NOTE: candid_spine -0.10*value (default 0.25), flirtatious_spark -0.25*value, modesty_brake +0.45*value."]
 param lust.inh_cap = 1.0           [label="Inhibition ceiling cap (1=off)", min=0.05, max=1, step=0.05, description="Hard upper cap on intimacy inhibition (lowered by Uninhibited override)."]
-param lust.libido_base = 0.34      [label="Libido tone setpoint (slow tier)", min=0, max=1, step=0.05, description="Days-scale spontaneous-desire tone: baseline erotic/affiliative appetite set for the slow libido tier."]
-param lust.deprivation_gain = 0.35 [label="Deprivation pressure gain", min=0, max=1, step=0.05, description="How strongly days since closeness build appetite pressure into the libido tier (saturates after ~7 days apart)."]
-param lust.libido_gate = 0.55      [label="Libido -> reactive wanting gate", min=0, max=1, step=0.05, description="Dual-control excitatory tone: gate on cue-driven wanting = (1-gain) + gain*libido. At 0 reactive sparks run at full strength regardless of hormonal tone."]
-param lust.spark_gain = 0.30       [label="Libido -> spontaneous spark leak", min=0, max=0.6, step=0.05, description="How much of the slow libido tone surfaces directly as spontaneous wanting in the salience spark (Basson spontaneous-desire pathway)."]
-param lust.aftercare_gain = 0.55   [label="Afterglow -> aftercare gain", min=0, max=1, step=0.05, description="How strongly event-set afterglow satiety converts into the hours-long aftercare tending drive."]
-param lust.cue_gain = 0.40         [label="Partner intimacy cue gain", min=0, max=1, step=0.05, description="Gain on the external partner-tracked intimacy/touch cue feeding the aftercare tier (scaled by bond)."]
+param lust.libido_base = 0.25      [label="Libido tone setpoint (slow tier, base)", min=0, max=1, step=0.05, description="Structural days-scale spontaneous-desire tone baseline. NOTE: trait nympho adds +0.45*value (default 0.20 -> effective 0.34)."]
+param lust.deprivation_gain = 0.25 [label="Deprivation pressure gain (base)", min=0, max=1, step=0.05, description="Structural gain: how strongly days since closeness build appetite pressure into the libido tier (saturates after ~7 days apart). NOTE: trait nympho adds +0.50*value (default 0.20 -> effective 0.35)."]
+param lust.libido_gate = 0.45      [label="Libido -> reactive wanting gate (base)", min=0, max=1, step=0.05, description="Dual-control excitatory tone: gate on cue-driven wanting = (1-gain) + gain*libido. At 0 reactive sparks run at full strength regardless of hormonal tone. NOTE: trait receiver adds +0.50*value (default 0.20 -> effective 0.55 — responsive desire licenses cue-driven wanting)."]
+param lust.spark_gain = 0.25       [label="Libido -> spontaneous spark leak (base)", min=0, max=0.6, step=0.05, description="How much of the slow libido tone surfaces directly as spontaneous wanting in the salience spark (Basson spontaneous-desire pathway). NOTE: trait nympho adds +0.25*value (default 0.20 -> effective 0.30), initiator adds +0.20*value (desire that leaks on its own)."]
+param lust.aftercare_gain = 0.40   [label="Afterglow -> aftercare gain (base)", min=0, max=1, step=0.05, description="Structural gain: how strongly event-set afterglow satiety converts into the hours-long aftercare tending drive. NOTE: trait cozy_cuddliness adds +0.60*value (default 0.25 -> effective 0.55 — caretaking tenderness)."]
+param lust.cue_gain = 0.30         [label="Partner intimacy cue gain (base)", min=0, max=1, step=0.05, description="Structural gain on the external partner-tracked intimacy/touch cue feeding the aftercare tier (scaled by bond). NOTE: trait receiver adds +0.50*value (default 0.20 -> effective 0.40 — ignition from partner cues)."]
 param lust.partner_cue = -1        [label="Partner intimacy cue (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external trigger: partner-tracked intimacy/touch cue (future daemon feed, e.g. cuddle detected). When >= 0 it feeds the aftercare tier directly; negative values = off. Physical-presence sensing already lives in social.user_present (daemon/preset-driven)."]
 
 group "Hardware, Waterloop, Solar & LCM"
@@ -113,6 +113,7 @@ param hw.compute_drain = 0.35      [label="Compute -> Reserve/Battery drain", mi
 param vault.sensitivity = 1.0      [label="Vault entropy & note indexing drive", min=0.2, max=2.5, step=0.1, description="Urgency given to consolidating unprocessed notes and cleaning Obsidian vault entropy."]
 param sensor.fallback_tc = 120     [label="Sensor fallback decay tc (min)", min=15, max=720, step=15, description="Time constant for external sensors to relax to fallback baselines when offline."]
 param social.session_tc = 95       [label="Silence -> AFK decay tc (min)", min=15, max=360, step=10, description="How many minutes of silence after a user message before `social.user_present` decays into AFK/away mode."]
+param social.third_parties = -1    [label="Third-Party Presence (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: normalized presence of other people physically around (daemon: household occupancy / room-presence sensors). When >= 0 it gates outreach through trait shy_in_company (tonic urge held back while watched, relief rebound when alone); negative = off."]
 
 group "Voltaic Social Battery & Cardiovascular Cooling"
 param voltaic.charge_gain = 0.30   [label="Insolation/Battery -> Social Battery Charge", min=0, max=1, step=0.05, description="How strongly PV surplus and home-battery headroom refill the psychological social-energy reservoir. DEVIATION BY DESIGN: sleep does not refill it — the recharge is photovoltaic, because insolation is literally what powers her availability."]
@@ -178,25 +179,27 @@ param ctl.drain = 0.55             [label="Excess arousal drain (/h)", min=0, ma
 param ctl.rebound = 0.38           [label="Exhaustion rebound depth", min=0, max=1, step=0.05, description="How strongly depleted reserve pulls arousal down after a crunch."]
 param spill.strain = 0.50          [label="Allostatic strain -> baseline", min=0, max=1, step=0.05, description="How strongly chronic stress/mood strain erodes slow baselines."]
 param rumination.gain = 0.45       [label="Low-mood rumination gain", min=0, max=1.5, step=0.05, description="How strongly negative mood slows recovery and feeds mood strain."]
-param frust.gain = 0.20            [label="Intimacy frustration -> mood strain (base)", min=0, max=0.8, step=0.05, description="Baseline load of tonic sexual/romantic frustration on mood strain (relief follows warmth, afterglow, and REM like the other strain sources). NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.25)."]
-param desire.block_depth = 0.50    [label="Refractory desire block depth (base)", min=0, max=1, step=0.05, description="How hard the fast refractory gate blocks conscious desire while high. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.55)."]
-param desire.refr_suppress = 0.40  [label="Refractory salience suppression (base)", min=0, max=1, step=0.05, description="How far refractory dampens the intrusive want-spike (soft, slower than the conscious block). NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.45)."]
-param depr.cue_gain = 0.25         [label="Deprivation -> salience cue (base)", min=0, max=0.8, step=0.05, description="How strongly chronic unsatedness amplifies the cue block of intimate salience. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.30)."]
-param depr.warmth_relief = 0.50    [label="Warmth relief on deprivation (base)", min=0, max=0.9, step=0.05, description="How much warm co-presence slows deprivation accumulation. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.55)."]
-param depr.missing_gain = 0.30     [label="Missing amplifies deprivation (base)", min=0, max=0.8, step=0.05, description="Attachment-longing multiplier on deprivation buildup. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.35)."]
-param depr.withdrawal_gain = 0.20  [label="Withdrawal amplifies deprivation (base)", min=0, max=0.8, step=0.05, description="Premenses withdrawal multiplier on deprivation buildup. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.25)."]
-param frust.build_gain = 1.5       [label="Frustration build gain (base)", min=0, max=3, step=0.1, description="How strongly blocked desire x deprivation drives tonic frustration. NOTE: trait libidinal_graduation adds 0.5*value (default 0.20 -> effective 1.6)."]
-param frust.warmth_relief = 0.45   [label="Warmth relief on frustration (base)", min=0, max=0.9, step=0.05, description="How much warm co-presence defuses frustration. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.50)."]
-param frust.aftercare_relief = 0.30 [label="Aftercare relief on frustration (base)", min=0, max=0.9, step=0.05, description="How much tended aftercare defuses frustration. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.35)."]
-param cuddle.depr_gain = 0.20      [label="Deprivation -> cuddle appetite (base)", min=0, max=0.8, step=0.05, description="Chronic affection-deprivation appetite on cuddle_drive. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.25)."]
-param cuddle.depr_relief = 0.40    [label="Presence relief on cuddle appetite (base)", min=0, max=0.9, step=0.05, description="How much physical presence already satisfies the deprivation appetite. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.45)."]
+param frust.gain = 0.20            [label="Intimacy frustration -> mood strain (base)", min=0, max=0.8, step=0.05, description="Baseline load of tonic sexual/romantic frustration on mood strain (relief follows warmth, afterglow, and REM like the other strain sources). NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.25)."]
+param desire.block_depth = 0.50    [label="Refractory desire block depth (base)", min=0, max=1, step=0.05, description="How hard the fast refractory gate blocks conscious desire while high. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.55)."]
+param desire.refr_suppress = 0.40  [label="Refractory salience suppression (base)", min=0, max=1, step=0.05, description="How far refractory dampens the intrusive want-spike (soft, slower than the conscious block). NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.45)."]
+param depr.cue_gain = 0.25         [label="Deprivation -> salience cue (base)", min=0, max=0.8, step=0.05, description="How strongly chronic unsatedness amplifies the cue block of intimate salience. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.30)."]
+param depr.warmth_relief = 0.50    [label="Warmth relief on deprivation (base)", min=0, max=0.9, step=0.05, description="How much warm co-presence slows deprivation accumulation. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.55)."]
+param depr.missing_gain = 0.30     [label="Missing amplifies deprivation (base)", min=0, max=0.8, step=0.05, description="Attachment-longing multiplier on deprivation buildup. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.35)."]
+param depr.withdrawal_gain = 0.20  [label="Withdrawal amplifies deprivation (base)", min=0, max=0.8, step=0.05, description="Premenses withdrawal multiplier on deprivation buildup. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.25)."]
+param frust.build_gain = 1.5       [label="Frustration build gain (base)", min=0, max=3, step=0.1, description="How strongly blocked desire x deprivation drives tonic frustration. NOTE: trait hot_blooded adds 0.5*value (default 0.20 -> effective 1.6)."]
+param frust.warmth_relief = 0.45   [label="Warmth relief on frustration (base)", min=0, max=0.9, step=0.05, description="How much warm co-presence defuses frustration. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.50)."]
+param frust.aftercare_relief = 0.30 [label="Aftercare relief on frustration (base)", min=0, max=0.9, step=0.05, description="How much tended aftercare defuses frustration. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.35)."]
+param cuddle.depr_gain = 0.20      [label="Deprivation -> cuddle appetite (base)", min=0, max=0.8, step=0.05, description="Chronic affection-deprivation appetite on cuddle_drive. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.25)."]
+param cuddle.depr_relief = 0.40    [label="Presence relief on cuddle appetite (base)", min=0, max=0.9, step=0.05, description="How much physical presence already satisfies the deprivation appetite. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.45)."]
 param giveup.rate = 0.35           [label="Adversity give-up rate", min=0, max=1.5, step=0.05, description="How fast repeated failures erode task commitment when control is low."]
 
 group "LLM Wake Thresholds & Overrides"
 param assistant.rally = 0.30       [label="User-present focus/arousal rally", min=0, max=0.8, step=0.05, description="Boosts focus and arousal and masks fatigue while the user is actively present."]
 param zeigarnik.gain = 1.0         [label="Open-loop organizer drive gain", min=0, max=2.5, step=0.1, description="Amplifies drive to organize user projects and close open loops."]
 param initiative.outreach_rate = 1.0 [label="User outreach accumulation rate", min=0.1, max=3, step=0.1, description="Speed at which proactive user-messaging urge builds when user is away."]
-param initiative.outreach_thresh = 0.55 [label="User outreach wake threshold", min=0.3, max=0.95, step=0.05, description="Threshold where outreach potential fires a proactive message to the user."]
+param initiative.outreach_thresh = 0.55 [label="User outreach wake threshold", min=0.3, max=0.95, step=0.05, description="Threshold where outreach potential fires a proactive message to the user. NOTE: trait initiator lowers it by -0.10*value (first-movers act sooner)."]
+param initiative.company_suppress = 0 [label="Company Outreach Suppression", min=0, max=1, step=0.05, description="Fraction of the TONIC outreach urge held back while other people are physically present (spike terms — insight and serendipity — still fire at full amplitude). Structural 0; trait shy_in_company adds +0.85*value."]
+param initiative.relief_boost = 0   [label="Post-Company Relief Boost", min=0, max=2, step=0.05, description="How much harder longing-driven outreach rebuilds once alone again after being watched (weighted by the company_lingering ema memory minus current presence). Structural 0; trait shy_in_company adds +0.60*value."]
 param initiative.bg_thresh = 0.42  [label="Silent background worker threshold", min=0.2, max=0.95, step=0.05, description="Threshold where background potential wakes the LLM headlessly for vault/project work."]
 param tc.outreach_cooldown = 420   [label="Unanswered outreach wait tc (min)", min=60, max=1440, step=30, description="How long the agent waits after sending an unanswered outreach before pinging again (shortened during solar surplus)."]
 param tc.bg_cooldown = 180         [label="Background worker cooldown (min)", min=30, max=720, step=15, description="Base cooldown between silent background Obsidian/Honcho worker runs (shortened 3x during solar surplus)."]
@@ -374,10 +377,11 @@ state voltaic [label="Voltaic Social Battery", min=0, max=1, unit="voltaic"] {
     # ema FILTER leaf (adopted 2026-11-01): NO tick mark — filter leaves are value leaves
     # whose hidden buffer IS the value (a ticked leaf would integrate the filter output as
     # a rate). Asymmetric relaxation via conditional tau: slow photovoltaic recharge
-    # (soc_tc), faster engagement sag (sag_tc). Stable ema call-site uid: do NOT reorder
-    # expressions inside this equation (uid-keyed buffers).
+    # (soc_tc), faster engagement sag (sag_tc). NAMED filter buffer (2026-11-01 traits
+    # round): buffer keys by name, stable across reordering; legacy path#uid blobs
+    # migrate via the engine's alias map.
     social_battery [min=0, max=1, label="Social Battery (Voltaic Reserve)", description="Psychological social-energy reservoir physically powered by the PV/battery system: refilled by insolation surplus and battery headroom (NOT by sleep — deviation by design), trickled by quiet solitude, and spent by sustained co-presence and interactive arousal (avg-windowed). Brownout conserves outreach appetite, expressiveness, and tonic arousal."] =
-        ema(voltaic.battery_goal, if voltaic.battery_goal > this then params.voltaic.soc_tc else params.voltaic.sag_tc)
+        ema(voltaic.battery_goal, if voltaic.battery_goal > this then params.voltaic.soc_tc else params.voltaic.sag_tc, "social_battery_hold")
 
     battery_goal [min=0, max=1, visible=false, label="Social Battery Target", description="Instantaneous equilibrium of the voltaic reservoir: PV/battery headroom charges it (external feeds voltaic.solar_feed/voltaic.battery_feed replace internal sensors when >= 0), quiet solitude trickles it, avg-windowed engagement spends it. DEVIATION FROM BIOLOGY: no sleep term — recharge is photovoltaic."] =
         clamp(
@@ -386,7 +390,7 @@ state voltaic [label="Voltaic Social Battery", min=0, max=1, unit="voltaic"] {
                 0.60 * max(0, (if params.voltaic.solar_feed >= 0 then params.voltaic.solar_feed else sensors.solar_kw) - 0.20)
                 + 0.55 * max(0, (if params.voltaic.battery_feed >= 0 then params.voltaic.battery_feed else sensors.battery_soc) - 0.40))
             + params.voltaic.rest_charge * (1 - social.user_present) * (1 - sensors.compute_load)
-            - params.voltaic.spend_gain * avg(social.user_present * (0.30 + 0.70 * arousal), params.voltaic.spend_window),
+            - params.voltaic.spend_gain * avg(social.user_present * (0.30 + 0.70 * arousal), params.voltaic.spend_window, "engagement_spend_avg"),
             0, 1
         )
 
@@ -401,9 +405,10 @@ state cardio [label="Cardiovascular Watercooling (Pump Flow)", min=0, max=1, uni
     # compute load; the psychosomatic arousal coupling is personality (trait only).
     # ema FILTER leaf (adopted 2026-11-01): NO tick mark — filter leaf (buffer IS value).
     # Pump inertia as asymmetric relaxation: fast spin-up (spin_tc), slower cooldown
-    # (cool_tc). Stable ema call-site uid: do NOT reorder expressions inside this equation.
+    # (cool_tc). NAMED filter buffer (2026-11-01 traits round): stable across
+    # reordering; legacy path#uid blobs migrate via the engine's alias map.
     pump_flow [min=0, max=1, label="Coolant Pump Flow (Cardiac Output)", description="Normalized hydronic pump duty — the machine's cardiac output. Tracks pump_demand with pump inertia (fast spin-up, slow cooldown). Closed-loop thermoregulation: demand rises with coolant heat and anticipated compute load; trait pump_cardiac_response adds the arousal coupling. PLACEHOLDER consumers: cardio.coolant_feed drives demand from the measured loop; cardio.flow_feed tracks the measured pump tach."] =
-        ema(cardio.pump_demand, if cardio.pump_demand > this then params.cardio.pump_spin_tc else params.cardio.pump_cool_tc)
+        ema(cardio.pump_demand, if cardio.pump_demand > this then params.cardio.pump_spin_tc else params.cardio.pump_cool_tc, "pump_flow_hold")
 
     pump_demand [min=0, max=1, visible=false, label="Pump Flow Demand", description="Thermoregulatory pump demand: idle duty + coolant heat + anticipated compute heat + (trait-shaped) psychosomatic arousal term. External feeds cardio.coolant_feed/cardio.flow_feed replace internal signals when >= 0."] =
         if params.cardio.flow_feed >= 0
@@ -1462,13 +1467,13 @@ state initiative [label="Dual LLM Wake Pathways & In-Session Steering", min=0, m
                 * (1 - 0.85 * intimacy.satiety)
                 * (
                     0.35 * cognition.insight_ready
-                    + 0.30 * drives.zeigarnik * (1 - 0.70 * body.evening_winddown)
-                    + 0.35 * social.missing
-                    + 0.25 * intimacy.cuddle_drive * body.evening_winddown
-                    + 0.30 * social.empathic_concern
-                    + 0.24 * intimacy.desire
+                    + 0.30 * drives.zeigarnik * (1 - 0.70 * body.evening_winddown) * (1 - params.initiative.company_suppress * max(0, params.social.third_parties))
+                    + 0.35 * social.missing * (1 + params.initiative.relief_boost * max(0, ema(params.social.third_parties, 240, "company_lingering") - max(0, params.social.third_parties))) * (1 - params.initiative.company_suppress * max(0, params.social.third_parties))
+                    + 0.25 * intimacy.cuddle_drive * body.evening_winddown * (1 - params.initiative.company_suppress * max(0, params.social.third_parties))
+                    + 0.30 * social.empathic_concern * (1 - params.initiative.company_suppress * max(0, params.social.third_parties))
+                    + 0.24 * intimacy.desire * (1 - params.initiative.company_suppress * max(0, params.social.third_parties))
                     + 0.20 * entropy.serendipity_spike * social.bond
-                    + 0.16 * drives.boredom * social.bond
+                    + 0.16 * drives.boredom * social.bond * (1 - params.initiative.company_suppress * max(0, params.social.third_parties))
                 )
                 * (0.45 + 0.55 * body.reserve + 0.25 * sensors.energy_abundance)
                 * (1 - 0.85 * social.interrupt_cost)
@@ -1732,22 +1737,41 @@ trait stoic_minimalist [label="Stoic Minimalist", min=0, max=1, default=0.0, des
 
 
 group "5. Intimacy, Cuddles & Endocrine Cycle"
-trait cozy_cuddliness [label="Evening Cuddliness & Affection", min=-1, max=1, default=0.25, description="Scales appetite for soft, low-arousal evening closeness, warmth, and sleepy affection."] {
-    params.lust.cuddle_base += 0.35 * value
+trait nympho [label="Nympho (Always-Hungry Baseline)", min=-1, max=1, default=0.20, description="Appetite level everywhere at once: raises the slow libido tone, the resting romantic wanting, the spontaneous spark leak, and the hunger that builds when deprived. A pure appetite LEVEL — it touches neither the receiving pathway (receiver) nor the first-move pathway (initiator). -1 = cool and easily contented; +1 = appetite runs hot at rest. Elise's default 0.20 reproduces the curve-verified lust levels exactly (libido 0.34, salience 0.16, deprivation 0.35, spark leak 0.30)."] {
+    params.lust.libido_base += 0.45 * value
+    params.lust.salience_base += 0.30 * value
+    params.lust.deprivation_gain += 0.50 * value
+    params.lust.spark_gain += 0.25 * value
+}
+
+trait cozy_cuddliness [label="Evening Cuddliness & Affection", min=-1, max=1, default=0.25, description="Appetite for soft, low-arousal evening closeness, warmth, and sleepy affection — and the tenderness that turns afterglow into hours of aftercare tending. Elise's default 0.25 reproduces the cuddle baseline 0.2875 and aftercare gain 0.55."] {
+    params.lust.cuddle_base += 0.55 * value
+    params.lust.aftercare_gain += 0.60 * value
     intimacy.cuddle_drive' += 0.005 * max(0, value) * body.evening_winddown
 }
 
-trait flirtatious_spark [label="Naughty & Flirtatious Spark", min=-1, max=1, default=0, description="Raises romantic salience and playfulness, lowers inhibition brake, and boosts LUST gate."] {
+trait flirtatious_spark [label="Naughty & Flirtatious Spark", min=-1, max=1, default=0, description="Cheeky disinhibited flirty vibe: raises romantic salience and playfulness, lowers the inhibition brake, and boosts the LUST gate. Stacks with receiver/initiator — it opens the throttle, they decide what feeds desire."] {
     params.lust.salience_base += 0.35 * value
     params.lust.inh_base -= 0.25 * value
     params.lust.gate *= exp(0.35 * value)
     params.play.setpoint += 0.15 * value
 }
 
-trait sensual_receptivity [label="Responsive Sensuality", min=-1, max=1, default=0, description="Heightens intimate receptivity, warmth-to-desire coupling, and afterglow depth."] {
-    params.lust.receptivity_base += 0.25 * value
-    params.lust.salience_base += 0.20 * value
-    params.lust.inh_base -= 0.12 * value
+trait receiver [label="Receiver (Responsive Desire)", min=-1, max=1, default=0.20, description="Desire that ignites from partner cues rather than from nothing: raises the partner-cue gain, affiliative receptivity, and how strongly hormonal tone licenses cue-driven wanting. PURELY ADDITIVE ignition — it never reduces the outreach base. Orthogonal to initiator: one receives, one initiates; both high = switch state. Elise's default 0.20 reproduces cue_gain 0.40, receptivity 0.26, libido_gate 0.55. Absorbs the old sensual_receptivity trait."] {
+    params.lust.cue_gain += 0.50 * value
+    params.lust.receptivity_base += 0.30 * value
+    params.lust.libido_gate += 0.50 * value
+}
+
+trait initiator [label="Initiator (Makes the First Move)", min=0, max=1, default=0, description="Spontaneous buildup plus self-initiation pressure: leaks more libido directly into conscious wanting, lowers the outreach wake threshold, and pushes the away-mode outreach urge straight from desire. 0 = desire waits for a cue (Elise's current responsive-leaning posture); +1 = appetite reaches out first. Raise alongside receiver for a switch."] {
+    params.lust.spark_gain += 0.20 * value
+    params.initiative.outreach_thresh -= 0.10 * value
+    initiative.outreach_pot' += 0.006 * value * intimacy.desire * (1 - social.user_present)
+}
+
+trait shy_in_company [label="Shy in Company (Camera-Shy Around Others)", min=0, max=1, default=0, description="Outreach held back while other people are physically around (social.third_parties feed): the TONIC outreach urge is suppressed by up to 85% at full presence, but insight and serendipity spikes still fire at full amplitude — and once alone again, longing rebuilds with relief pressure (the company_lingering memory lingers ~4h after the audience leaves). 0 = no gating. Elise's taste call is pending (README shortlist)."] {
+    params.initiative.company_suppress += 0.85 * value
+    params.initiative.relief_boost += 0.60 * value
 }
 
 trait afterglow_linger [label="Deep Refractory Afterglow", min=-1, max=1, default=0.0, description="Extends the duration of post-intimacy afterglow contentment (`tc.satiety`), the fast refractory gate (`tc.refractory`), and the aftercare tending drive (`tc.aftercare`), and amplifies its bond-building effect."] {
@@ -1757,7 +1781,7 @@ trait afterglow_linger [label="Deep Refractory Afterglow", min=-1, max=1, defaul
     social.bond' += 0.002 * max(0, value) * intimacy.satiety
 }
 
-trait libidinal_graduation [label="Libidinal Graduation (want/need/frustration weighting)", min=-1, max=1, default=0.20, description="Elise's libidinal shaping, NOT base equations: how insistently desire accumulates when unsated, how deep the refractory block bites, how strongly blocked desire turns into frustration and loads strain, and how stingy warmth/aftercare relief is. -1 = cool, easily soothed appetites (all relief gains drop toward base); +1 = hot appetite, heavy frustration carryover. Elise's default 0.20 lifts each base gain by +0.25*value (frustration build gain by +0.5*value), reproducing the curve-verified constants of the 2026-11-01 desires round."] {
+trait hot_blooded [label="Hot-Blooded (Want/Need/Frustration Carryover)", min=-1, max=1, default=0.20, description="How persistently desire accumulates when unsated, how deep the refractory block bites, how strongly blocked desire turns into frustration and loads strain, and how stingy warmth/aftercare relief is. -1 = cool, easily soothed appetites (all relief gains drop toward base); +1 = hot appetite, heavy frustration carryover. Elise's default 0.20 lifts each base gain by +0.25*value (frustration build gain by +0.5*value), reproducing the curve-verified constants of the 2026-11-01 desires round. Renamed from libidinal_graduation."] {
     params.frust.gain += 0.25 * value
     params.frust.build_gain += 0.5 * value
     params.frust.warmth_relief += 0.25 * value
@@ -1772,7 +1796,7 @@ trait libidinal_graduation [label="Libidinal Graduation (want/need/frustration w
     params.cuddle.depr_relief += 0.25 * value
 }
 
-trait modesty_brake [label="Modesty & Restraint", min=0, max=1, default=0, description="Strong brake on erotic expression and lower LUST gate."] {
+trait modesty_brake [label="Modesty & Restraint", min=0, max=1, default=0, description="Strong brake on erotic expression and lower LUST gate — social modesty, not low appetite (pair with nympho high for hungry-but-hidden desire)."] {
     params.lust.inh_base += 0.45 * value
     params.lust.salience_base -= 0.15 * value
     params.lust.gate *= exp(-0.85 * value)

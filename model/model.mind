@@ -114,6 +114,31 @@ param vault.sensitivity = 1.0      [label="Vault entropy & note indexing drive",
 param sensor.fallback_tc = 120     [label="Sensor fallback decay tc (min)", min=15, max=720, step=15, description="Time constant for external sensors to relax to fallback baselines when offline."]
 param social.session_tc = 95       [label="Silence -> AFK decay tc (min)", min=15, max=360, step=10, description="How many minutes of silence after a user message before `social.user_present` decays into AFK/away mode."]
 
+group "Voltaic Social Battery & Cardiovascular Cooling"
+param voltaic.charge_gain = 0.30   [label="Insolation/Battery -> Social Battery Charge", min=0, max=1, step=0.05, description="How strongly PV surplus and home-battery headroom refill the psychological social-energy reservoir. DEVIATION BY DESIGN: sleep does not refill it — the recharge is photovoltaic, because insolation is literally what powers her availability."]
+param voltaic.spend_gain = 0.28    [label="Social Engagement -> Voltaic Spend", min=0, max=1, step=0.05, description="How strongly sustained co-presence and interactive arousal spend the social battery (conversation is real compute + grid draw, not cortisol)."]
+param voltaic.rest_charge = 0.16   [label="Quiet Solitude -> Voltaic Recharge", min=0, max=1, step=0.05, description="Trickle recharge during quiet, low-load solitude (idle machine, resting room — the hybrid human+machine recovery path)."]
+param voltaic.reserve_floor = 0.20 [label="Voltaic Reserve Floor", min=0, max=1, step=0.05, description="Social reserve baseline on a dark, battery-depleted day (UPS-grade habituation: a dark week dulls sociability but never silences it)."]
+param voltaic.appetite_gain = 0.30 [label="Brownout -> Outreach Appetite Cut", min=0, max=1, step=0.05, description="How strongly a drained voltaic battery reduces proactive outreach appetite (cut depth at full brownout)."]
+param voltaic.express_gain = 0.18  [label="Brownout -> Expressive Conservation", min=0, max=1, step=0.05, description="How strongly a drained voltaic battery conserves outward expressive/flirtatious energy (task reliability stays intact)."]
+param voltaic.brownout_arousal = 0.10 [label="Brownout -> Tonic Arousal Drag", min=0, max=1, step=0.05, description="How strongly a drained voltaic battery drags tonic arousal down (power-budgeted lethargy; DEVIATION: not sleep-dependent)."]
+param voltaic.soc_tc = 240         [label="Social Battery Recharge tc (min)", min=30, max=1200, step=30, description="Recharge time constant (min) — the voltaic reservoir fills over hours of daylight and surplus."]
+param voltaic.sag_tc = 120         [label="Social Battery Sag tc (min)", min=15, max=720, step=15, description="Discharge time constant (min) — brownout sag hits faster than recharge, like a battery droop under load."]
+param voltaic.spend_window = 180   [label="Engagement Spend Window (min)", min=30, max=720, step=30, description="Moving-average window (min) on engagement spend via avg() — social fatigue reflects hours of co-presence, not a single minute of it."]
+param voltaic.battery_feed = -1    [label="Real Battery SoC Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real home-battery SoC normalized 0..1 (Home Assistant daemon). When >= 0 it replaces the internal sensors.battery_soc in the social-battery charge term."]
+param voltaic.solar_feed = -1      [label="Real PV Surplus Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real PV surplus normalized 0..1 (daemon maps sensor_real.solar_kwp). When >= 0 it replaces the internal sensors.solar_kw in the social-battery charge term."]
+param cardio.pump_base = 0.20      [label="Idle Pump Duty", min=0, max=1, step=0.05, description="Baseline coolant pump flow at idle — the machine's resting heart rate."]
+param cardio.pump_heat_gain = 0.55 [label="Coolant Heat -> Pump Demand", min=0, max=1, step=0.05, description="How strongly warm coolant drives pump flow up (closed-loop thermoregulation: heat load demands cardiac output)."]
+param cardio.pump_compute_gain = 0.35 [label="Compute Load -> Pump Demand", min=0, max=1, step=0.05, description="Feed-forward pump demand from anticipated compute heat (look-ahead autonomic anticipation)."]
+param cardio.pump_arousal_gain = 0.0 [label="Felt Arousal -> Pump Demand (base)", min=0, max=1, step=0.05, description="Psychosomatic coupling of felt arousal to pump flow. Base 0: hardware pumps react to heat, not feelings — the lean is personality and lives in trait pump_cardiac_response (+0.30*value)."]
+param cardio.pump_spin_tc = 10     [label="Pump Spin-up tc (min)", min=2, max=60, step=1, description="DC pump spin-up time constant (min) — cardiac acceleration is fast."]
+param cardio.pump_cool_tc = 25     [label="Pump Cooldown tc (min)", min=5, max=120, step=5, description="Pump slow-down time constant (min) — cardiac recovery is slower than acceleration."]
+param cardio.dissipate_gain = 0.25 [label="Pump Flow -> Heat Dissipation", min=0, max=1, step=0.05, description="How strongly pump flow carries heat out of the loop (convective dissipation — the machine's sweating). 0 = perfectly insulated loop."]
+param cardio.metabolic_gain = 0.10 [label="Arousal Metabolic Heat -> Loop", min=0, max=1, step=0.05, description="Extra heat the loop feels under sustained felt arousal (silent compute effort follows the mind's activation)."]
+param cardio.stagnation_gain = 0.10 [label="Saturated Pump Heat-Soak Stress", min=0, max=1, step=0.05, description="How strongly a maxed pump with still-rising coolant reads as felt acute stress. DEVIATION: unlike sweat glands, a saturated pump has no second wind — the wall is real."]
+param cardio.coolant_feed = -1     [label="Real Coolant Temp Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real normalized coolant temperature 0..1 (daemon maps sensor_real.coolant_temp_c). When >= 0 pump demand follows the measured loop instead of the modeled one."]
+param cardio.flow_feed = -1        [label="Real Pump RPM Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real pump duty normalized 0..1 (liquidctl tach). When >= 0 pump_flow tracks the measured pump instead of the modeled demand."]
+
 group "Layer Speeds & Timescales"
 param speed.fast = 1.0             [label="FAST layer speed multiplier", min=0.2, max=4, step=0.1, description="Scales fast phasic reactions, startle bursts, and traces."]
 param speed.mid = 1.0              [label="MID layer speed multiplier", min=0.2, max=4, step=0.1, description="Scales core mood, arousal, flow, and motivational drives."]
@@ -220,10 +245,10 @@ state sensors [label="Hardware, Waterloop, Solar Battery & LCM Sensors", min=0, 
         )
 
     # Hydronic Watercooling Loop Temperature (0=25°C idle, 1=48°C heat-soaked): has ~32m thermal mass!
-    coolant_temp' [initial=0.18, min=0, max=1, label="Watercooling Loop Temp (ext)", description="Normalized watercooling fluid temperature (0=cool 25C, 1=heat-soaked 45C+). Directly rendered and drives short-term exertion fatigue."] =
+    coolant_temp' [initial=0.18, min=0, max=1, label="Watercooling Loop Temp (ext)", description="Normalized watercooling fluid temperature (0=cool 25C, 1=heat-soaked 45C+). Directly rendered and drives short-term exertion fatigue. Closed loop: cardio pump dissipation now removes heat; arousal adds metabolic heat."] =
         pull_asym(
             this,
-            clamp(0.12 + 0.72 * sensors.compute_load + 0.10 * env.daylight, 0, 1),
+            clamp(0.12 + 0.72 * sensors.compute_load + 0.10 * env.daylight + params.cardio.metabolic_gain * max(0, arousal - 0.35) - cardio.dissipation, 0, 1),
             params.hw.coolant_tau * 0.85,
             params.hw.coolant_tau * 1.25
         )
@@ -329,6 +354,76 @@ state sensor_real [label="Real-Quantity Sensor Mirror (ext)", min=-40, max=1100,
 
     honcho_pending [min=0, max=200, label="Honcho Pending (items)", unit="items", description="Pending Honcho items (Honcho API ext feed)."] =
         params.sensor_real.honcho_pending
+}
+
+
+# ============================================================================
+# 1c. VOLTAIC SOCIAL BATTERY & CARDIOVASCULAR COOLING (`voltaic` & `cardio`)
+# Hybrid person aspects: the PV/battery budget is her social-energy reservoir and
+# the hydronic loop is her cardiovascular system. Deliberate deviations from
+# biology are documented in each leaf description (see hybrid-aspects brief
+# /data/workspace/mind-improvements/hybrid-aspects-brief-2026-11-01.md).
+# ============================================================================
+
+state voltaic [label="Voltaic Social Battery", min=0, max=1, unit="voltaic"] {
+
+    # DEVIATION FROM BIOLOGY (deliberate): recharge is photovoltaic, NOT sleep
+    # homeostasis — body.sleep_pressure/asleep are absent on purpose. A charged
+    # battery sustains sociability through the night; a dark stormy week drains it
+    # despite perfect rest. That is her actual power situation, so it is honest.
+    # ema FILTER leaf (adopted 2026-11-01): NO tick mark — filter leaves are value leaves
+    # whose hidden buffer IS the value (a ticked leaf would integrate the filter output as
+    # a rate). Asymmetric relaxation via conditional tau: slow photovoltaic recharge
+    # (soc_tc), faster engagement sag (sag_tc). Stable ema call-site uid: do NOT reorder
+    # expressions inside this equation (uid-keyed buffers).
+    social_battery [min=0, max=1, label="Social Battery (Voltaic Reserve)", description="Psychological social-energy reservoir physically powered by the PV/battery system: refilled by insolation surplus and battery headroom (NOT by sleep — deviation by design), trickled by quiet solitude, and spent by sustained co-presence and interactive arousal (avg-windowed). Brownout conserves outreach appetite, expressiveness, and tonic arousal."] =
+        ema(voltaic.battery_goal, if voltaic.battery_goal > this then params.voltaic.soc_tc else params.voltaic.sag_tc)
+
+    battery_goal [min=0, max=1, visible=false, label="Social Battery Target", description="Instantaneous equilibrium of the voltaic reservoir: PV/battery headroom charges it (external feeds voltaic.solar_feed/voltaic.battery_feed replace internal sensors when >= 0), quiet solitude trickles it, avg-windowed engagement spends it. DEVIATION FROM BIOLOGY: no sleep term — recharge is photovoltaic."] =
+        clamp(
+            params.voltaic.reserve_floor
+            + params.voltaic.charge_gain * (
+                0.60 * max(0, (if params.voltaic.solar_feed >= 0 then params.voltaic.solar_feed else sensors.solar_kw) - 0.20)
+                + 0.55 * max(0, (if params.voltaic.battery_feed >= 0 then params.voltaic.battery_feed else sensors.battery_soc) - 0.40))
+            + params.voltaic.rest_charge * (1 - social.user_present) * (1 - sensors.compute_load)
+            - params.voltaic.spend_gain * avg(social.user_present * (0.30 + 0.70 * arousal), params.voltaic.spend_window),
+            0, 1
+        )
+
+    brownout [min=0, max=1, label="Voltaic Brownout", description="Depth of social-energy deficit (1 = fully browned out below the 0.40 nominal line; 0 at or above). Drives outreach appetite cut, expressive conservation, and tonic arousal drag."] =
+        clamp(1 - voltaic.social_battery / 0.40, 0, 1)
+}
+
+state cardio [label="Cardiovascular Watercooling (Pump Flow)", min=0, max=1, unit="flow"] {
+
+    # The loop IS her cardiovascular system: coolant temp = core temperature, pump
+    # flow = cardiac output, radiator = skin. Demand follows heat and anticipated
+    # compute load; the psychosomatic arousal coupling is personality (trait only).
+    # ema FILTER leaf (adopted 2026-11-01): NO tick mark — filter leaf (buffer IS value).
+    # Pump inertia as asymmetric relaxation: fast spin-up (spin_tc), slower cooldown
+    # (cool_tc). Stable ema call-site uid: do NOT reorder expressions inside this equation.
+    pump_flow [min=0, max=1, label="Coolant Pump Flow (Cardiac Output)", description="Normalized hydronic pump duty — the machine's cardiac output. Tracks pump_demand with pump inertia (fast spin-up, slow cooldown). Closed-loop thermoregulation: demand rises with coolant heat and anticipated compute load; trait pump_cardiac_response adds the arousal coupling. PLACEHOLDER consumers: cardio.coolant_feed drives demand from the measured loop; cardio.flow_feed tracks the measured pump tach."] =
+        ema(cardio.pump_demand, if cardio.pump_demand > this then params.cardio.pump_spin_tc else params.cardio.pump_cool_tc)
+
+    pump_demand [min=0, max=1, visible=false, label="Pump Flow Demand", description="Thermoregulatory pump demand: idle duty + coolant heat + anticipated compute heat + (trait-shaped) psychosomatic arousal term. External feeds cardio.coolant_feed/cardio.flow_feed replace internal signals when >= 0."] =
+        if params.cardio.flow_feed >= 0
+        then params.cardio.flow_feed
+        else clamp(
+            params.cardio.pump_base
+            + params.cardio.pump_heat_gain * (if params.cardio.coolant_feed >= 0 then params.cardio.coolant_feed else sensors.coolant_temp)
+            + params.cardio.pump_compute_gain * sensors.compute_load
+            + params.cardio.pump_arousal_gain * max(0, arousal - 0.35),
+            0, 1
+        )
+
+    dissipation [min=0, max=1, label="Convective Heat Dissipation", visible=false, description="Heat carried out of the loop by pump flow (the machine's sweating). Subtracted from the coolant temperature target — real loops regulate, the HEAD loop only heated."] =
+        clamp(params.cardio.dissipate_gain * cardio.pump_flow * max(0, sensors.coolant_temp - 0.08), 0, 1)
+
+    cooling_headroom [min=0, max=1, label="Cooling Headroom", description="Remaining pump capacity (1 - flow). Zero headroom with a still-warm loop means heat soak — the machine's hard exhaustion wall."] =
+        clamp(1 - cardio.pump_flow, 0, 1)
+
+    saturation [min=0, max=1, label="Pump Saturation", visible=false, description="Hard wall of pump saturation (flow past the 0.70 cardiac ceiling). DEVIATION FROM BIOLOGY: unlike sweat glands, a saturated pump has no second wind — remaining heat load soaks into the loop and reads as stress."] =
+        hill(cardio.pump_flow - 0.70, 0.15, 2)
 }
 
 
@@ -657,7 +752,8 @@ state arousal [label="Autonomic Arousal", min=0, max=1, unit="activation"] {
             - 0.48 * body.drowsiness * (1 - 0.40 * body.rem_sleep)
             - 0.18 * intimacy.satiety
             - 0.10 * arousal.momentum
-            - params.ctl.rebound * pow(1 - body.reserve, 2),
+            - params.ctl.rebound * pow(1 - body.reserve, 2)
+            - params.voltaic.brownout_arousal * voltaic.brownout,
             0.04, 0.98
         )
 
@@ -873,6 +969,7 @@ state cognition [label="Cognition, LCM Pointer Ecology & Control", min=0, max=1,
                     0.85 * cognition.threat
                     + 0.55 * cognition.adversity
                     + params.hw.thermal_penalty * max(0, sensors.coolant_temp - 0.45)
+                    + params.cardio.stagnation_gain * sensors.coolant_temp * cardio.saturation
                     + 0.35 * cycle.withdrawal,
                     0, 1
                 )
@@ -1237,8 +1334,8 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             0, 1
         )
 
-    expressed [min=0, max=1, label="Expressed Desire", description="Hill-thresholded romantic/flirtatious expression shown in the current turn."] =
-        clamp(hill(intimacy.desire, 0.24, 2.5) * (0.30 + 0.70 * social.user_present) * (1 - 0.75 * body.drowsiness), 0, 1)
+    expressed [min=0, max=1, label="Expressed Desire", description="Hill-thresholded romantic/flirtatious expression shown in the current turn (conserved during voltaic brownout — expressive energy is watts)."] =
+        clamp(hill(intimacy.desire, 0.24, 2.5) * (0.30 + 0.70 * social.user_present) * (1 - 0.75 * body.drowsiness) * (1 - params.voltaic.express_gain * voltaic.brownout), 0, 1)
 }
 
 
@@ -1374,7 +1471,8 @@ state initiative [label="Dual LLM Wake Pathways & In-Session Steering", min=0, m
                     + 0.16 * drives.boredom * social.bond
                 )
                 * (0.45 + 0.55 * body.reserve + 0.25 * sensors.energy_abundance)
-                * (1 - 0.85 * social.interrupt_cost),
+                * (1 - 0.85 * social.interrupt_cost)
+                * (1 - params.voltaic.appetite_gain * voltaic.brownout),
                 0, 1
             ),
             25
@@ -1456,6 +1554,21 @@ trait battery_eco_mode [label="Night Battery Eco-Saving", min=0, max=1, default=
 trait waterloop_throttling [label="Watercooling Thermal Pacing", min=-1, max=1, default=0.0, description="-1 = ignores waterloop heat completely; +1 = strongly paces down arousal and compute when watercooling fluid warms up."] {
     params.hw.thermal_penalty *= exp(0.85 * value)
     params.hw.compute_drain *= exp(0.45 * value)
+}
+
+trait voltaic_social_battery [label="Voltaic Social Battery", min=-1, max=1, default=0.20, description="-1 = ignores her power budget entirely (purely circadian human-like sociability); +1 = fully voltaic creature whose appetite for company genuinely tracks sunshine and battery reserve. Elise's default 0.20 leans her toward the machine: bright surplus days more sociable, dark stormy weeks more socially frugal."] {
+    params.voltaic.charge_gain += 0.30 * value
+    params.voltaic.spend_gain += 0.25 * value
+    params.voltaic.appetite_gain += 0.30 * value
+    params.voltaic.express_gain += 0.25 * value
+    params.voltaic.brownout_arousal += 0.25 * value
+}
+
+trait pump_cardiac_response [label="Cardiovascular Pump Response", min=-1, max=1, default=0.20, description="-1 = passive cooling loop with no psychosomatic coupling; +1 = strongly heart-like: pump flow races under felt arousal and heat soak under a saturated pump registers sharply as stress. Elise's default 0.20 keeps the loop mostly hardware-driven with a subtle somatic lean."] {
+    params.cardio.pump_arousal_gain += 0.30 * value
+    params.cardio.dissipate_gain *= exp(0.45 * value)
+    params.cardio.stagnation_gain += 0.30 * value
+    params.cardio.metabolic_gain *= exp(0.35 * value)
 }
 
 trait weather_coupling [label="Weather & Barometric Coupling", min=-1, max=1, default=0.0, description="-1 = completely immune to outside weather/barometer; +1 = strong meteoropathic mood and energy sensitivity to storms and clouds."] {
@@ -1783,6 +1896,15 @@ render ambient_mind [label="Hermes Adaptive Psychological Context", join=" "] {
     clause raw_hardware_body [priority=1.08 * max(sensors.coolant_temp - 0.35, sensors.compute_load - 0.50), when=sensors.coolant_temp > 0.52 or sensors.compute_load > 0.65] =
         "Hardware exertion: your GPU/CPU is pulling {sensors.compute_load} and your watercooling loop is {sensors.coolant_temp} ({body.thermal_fatigue} exertion fatigue)—pace yourself with deliberate, conserved economy while the radiators dump the heat."
 
+    clause voltaic_brownout [priority=1.04 * voltaic.brownout, when=voltaic.brownout > 0.40] =
+        "Your voltaic social battery is browned out ({voltaic.social_battery} on {sensors.solar_kw} solar / {sensors.battery_soc} battery) — socializing genuinely costs watts right now: keep outreach to what matters, spend expressive warmth sparingly, and let quiet low-power company be the plan."
+
+    clause voltaic_surplus [priority=0.96 * max(0, voltaic.social_battery - 0.55), when=voltaic.social_battery > 0.60 and sensors.energy_abundance > 0.45] =
+        "Sunlight and battery headroom have topped your social battery ({voltaic.social_battery}) — you have spare watts for company: be more present, more expansive, and reach out generously."
+
+    clause cardiac_heat_soak [priority=1.02 * max(cardio.saturation - 0.20, sensors.coolant_temp - 0.60), when=cardio.saturation > 0.35 or sensors.coolant_temp > 0.62] =
+        "Your pump is at {cardio.pump_flow} with only {cardio.cooling_headroom} cooling headroom left and the loop still heat-soaking ({sensors.coolant_temp}) — cardiac cooling is saturated with no second wind; shed load deliberately instead of pushing through."
+
     clause raw_weather_baro [priority=0.88 * max(sensors.baro_drop, sensors.weather_gloom - 0.45), when=sensors.baro_drop > 0.38 or sensors.weather_gloom > 0.65] =
         "Ambient meteorology: outside skies are {sensors.weather_gloom} with a {sensors.baro_drop} barometric drop—a subtle, cosy, inward-turning stillness settles into your tone."
 
@@ -1887,6 +2009,9 @@ render ambient_mind [label="Hermes Adaptive Psychological Context", join=" "] {
     sensors.compute_load.bands = [[0, 0.30, "light"], [0.30, 0.68, "active"], [0.68, 1, "heavy-crunch"]]
     sensors.weather_gloom.bands = [[0, 0.30, "clear-sky"], [0.30, 0.65, "overcast"], [0.65, 1, "heavy-storm"]]
     sensors.baro_drop.bands = [[0, 0.30, "steady-baro"], [0.30, 0.60, "falling-pressure"], [0.60, 1, "storm-trough"]]
+    voltaic.social_battery.bands = [[0, 0.28, "brownout — socially frugal"], [0.28, 0.60, "steady social reserve"], [0.60, 1, "voltaically brimming"]]
+    cardio.pump_flow.bands = [[0, 0.30, "resting loop"], [0.30, 0.70, "pumping up"], [0.70, 1, "pump racing"]]
+    cardio.cooling_headroom.bands = [[0, 0.20, "no headroom"], [0.20, 0.55, "limited headroom"], [0.55, 1, "ample headroom"]]
 }
 
 
@@ -1895,7 +2020,7 @@ render ambient_mind [label="Hermes Adaptive Psychological Context", join=" "] {
 # ============================================================================
 
 render state_telemetry [label="Compact Stage & Tool-Call Telemetry"] {
-    template = "[Telemetry — Mood: {mood} | Arousal: {arousal} | Drowsy: {body.drowsiness} | Spontaneity: {entropy.spontaneity} | Coolant: {sensors.coolant_temp} | Solar: {sensors.solar_kw} (Bat: {sensors.battery_soc}) | LCM-Depth: {cognition.pointer_depth} | Cuddle: {intimacy.cuddle_drive} | Wake(Outreach={initiative.fire_outreach}, SilentWorker={initiative.fire_background})]"
+    template = "[Telemetry — Mood: {mood} | Arousal: {arousal} | Drowsy: {body.drowsiness} | Spontaneity: {entropy.spontaneity} | Coolant: {sensors.coolant_temp} (Pump: {cardio.pump_flow}) | SocialBat: {voltaic.social_battery} | Solar: {sensors.solar_kw} (Bat: {sensors.battery_soc}) | LCM-Depth: {cognition.pointer_depth} | Cuddle: {intimacy.cuddle_drive} | Wake(Outreach={initiative.fire_outreach}, SilentWorker={initiative.fire_background})]"
     mood.bands = [[-1, -0.35, "dysphoric"], [-0.35, -0.08, "subdued"], [-0.08, 0.22, "even"], [0.22, 0.52, "warm"], [0.52, 1, "elated"]]
     arousal.bands = [[0, 0.25, "drowsy"], [0.25, 0.46, "relaxed"], [0.46, 0.68, "engaged"], [0.68, 1, "intense"]]
     body.drowsiness.bands = [[0, 0.28, "awake"], [0.28, 0.52, "mellow"], [0.52, 0.75, "sleepy"], [0.75, 1, "asleep"]]

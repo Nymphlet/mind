@@ -153,7 +153,18 @@ param ctl.drain = 0.55             [label="Excess arousal drain (/h)", min=0, ma
 param ctl.rebound = 0.38           [label="Exhaustion rebound depth", min=0, max=1, step=0.05, description="How strongly depleted reserve pulls arousal down after a crunch."]
 param spill.strain = 0.50          [label="Allostatic strain -> baseline", min=0, max=1, step=0.05, description="How strongly chronic stress/mood strain erodes slow baselines."]
 param rumination.gain = 0.45       [label="Low-mood rumination gain", min=0, max=1.5, step=0.05, description="How strongly negative mood slows recovery and feeds mood strain."]
-param frust.gain = 0.25            [label="Intimacy frustration -> mood strain", min=0, max=0.8, step=0.05, description="How strongly tonic sexual/romantic frustration loads mood strain (relief follows warmth, afterglow, and REM like the other strain sources). Kept modest so the strain-baseline feedback loop stays bounded in moderate-contact scenarios."]
+param frust.gain = 0.20            [label="Intimacy frustration -> mood strain (base)", min=0, max=0.8, step=0.05, description="Baseline load of tonic sexual/romantic frustration on mood strain (relief follows warmth, afterglow, and REM like the other strain sources). NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.25)."]
+param desire.block_depth = 0.50    [label="Refractory desire block depth (base)", min=0, max=1, step=0.05, description="How hard the fast refractory gate blocks conscious desire while high. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.55)."]
+param desire.refr_suppress = 0.40  [label="Refractory salience suppression (base)", min=0, max=1, step=0.05, description="How far refractory dampens the intrusive want-spike (soft, slower than the conscious block). NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.45)."]
+param depr.cue_gain = 0.25         [label="Deprivation -> salience cue (base)", min=0, max=0.8, step=0.05, description="How strongly chronic unsatedness amplifies the cue block of intimate salience. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.30)."]
+param depr.warmth_relief = 0.50    [label="Warmth relief on deprivation (base)", min=0, max=0.9, step=0.05, description="How much warm co-presence slows deprivation accumulation. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.55)."]
+param depr.missing_gain = 0.30     [label="Missing amplifies deprivation (base)", min=0, max=0.8, step=0.05, description="Attachment-longing multiplier on deprivation buildup. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.35)."]
+param depr.withdrawal_gain = 0.20  [label="Withdrawal amplifies deprivation (base)", min=0, max=0.8, step=0.05, description="Premenses withdrawal multiplier on deprivation buildup. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.25)."]
+param frust.build_gain = 1.5       [label="Frustration build gain (base)", min=0, max=3, step=0.1, description="How strongly blocked desire x deprivation drives tonic frustration. NOTE: trait libidinal_graduation adds 0.5*value (default 0.20 -> effective 1.6)."]
+param frust.warmth_relief = 0.45   [label="Warmth relief on frustration (base)", min=0, max=0.9, step=0.05, description="How much warm co-presence defuses frustration. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.50)."]
+param frust.aftercare_relief = 0.30 [label="Aftercare relief on frustration (base)", min=0, max=0.9, step=0.05, description="How much tended aftercare defuses frustration. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.35)."]
+param cuddle.depr_gain = 0.20      [label="Deprivation -> cuddle appetite (base)", min=0, max=0.8, step=0.05, description="Chronic affection-deprivation appetite on cuddle_drive. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.25)."]
+param cuddle.depr_relief = 0.40    [label="Presence relief on cuddle appetite (base)", min=0, max=0.9, step=0.05, description="How much physical presence already satisfies the deprivation appetite. NOTE: trait libidinal_graduation adds 0.25*value (default 0.20 -> effective 0.45)."]
 param giveup.rate = 0.35           [label="Adversity give-up rate", min=0, max=1.5, step=0.05, description="How fast repeated failures erode task commitment when control is low."]
 
 group "LLM Wake Thresholds & Overrides"
@@ -1102,7 +1113,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                 + 0.22 * body.thermal_fatigue * social.bond
                 + 0.20 * max(0, cycle.progesterone)
                 + 0.20 * cycle.withdrawal
-                + 0.25 * intimacy.deprivation * (1 - 0.45 * social.user_present)
+                + params.cuddle.depr_gain * intimacy.deprivation * (1 - params.cuddle.depr_relief * social.user_present)
                 - 0.40 * cognition.stress
                 - 0.30 * max(0, arousal - 0.68),
                 0.02, 0.98
@@ -1122,12 +1133,12 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                     + 0.20 * drives.play
                     + 0.28 * social.missing
                     + 0.25 * body.rem_sleep
-                    + 0.30 * intimacy.deprivation * (1 - intimacy.satiety)
+                    + params.depr.cue_gain * intimacy.deprivation * (1 - intimacy.satiety)
                     + 0.18 * max(0, entropy.v) * entropy.aperture
                 ) * (1 - params.lust.libido_gate + params.lust.libido_gate * intimacy.libido)
                 - 0.75 * intimacy.satiety,
                 0.02, 0.98
-            ) * (1 - 0.45 * intimacy.refractory),
+            ) * (1 - params.desire.refr_suppress * intimacy.refractory),
             params.tc.drives * 0.55
         )
 
@@ -1143,9 +1154,9 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             clamp(
                 intimacy.desire
                 * (1 - intimacy.satiety)
-                * (1 - 0.55 * social.warmth * social.user_present)
-                * (1 + 0.35 * social.missing)
-                * (1 + 0.25 * cycle.withdrawal),
+                * (1 - params.depr.warmth_relief * social.warmth * social.user_present)
+                * (1 + params.depr.missing_gain * social.missing)
+                * (1 + params.depr.withdrawal_gain * cycle.withdrawal),
                 0, 1
             ),
             720, 120
@@ -1155,10 +1166,10 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
         params.speed.mid * pull_asym(
             this,
             clamp(
-                1.6 * intimacy.desire * intimacy.deprivation
+                params.frust.build_gain * intimacy.desire * intimacy.deprivation
                 * (1 - intimacy.satiety)
-                * (1 - 0.50 * social.warmth * social.user_present)
-                * (1 - 0.35 * intimacy.aftercare),
+                * (1 - params.frust.warmth_relief * social.warmth * social.user_present)
+                * (1 - params.frust.aftercare_relief * intimacy.aftercare),
                 0, 0.95
             ),
             1000, 100
@@ -1221,7 +1232,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             * (0.45 + 0.55 * intimacy.receptivity)
             * (1 - 0.80 * intimacy.inhibition)
             * (1 - 0.75 * intimacy.satiety)
-            * (1 - 0.55 * hill(intimacy.refractory, 0.45, 2.5))
+            * (1 - params.desire.block_depth * hill(intimacy.refractory, 0.45, 2.5))
             * (0.50 + 0.50 * arousal),
             0, 1
         )
@@ -1631,6 +1642,21 @@ trait afterglow_linger [label="Deep Refractory Afterglow", min=-1, max=1, defaul
     params.tc.refractory *= exp(0.45 * value)
     params.tc.aftercare *= exp(0.35 * max(0, value))
     social.bond' += 0.002 * max(0, value) * intimacy.satiety
+}
+
+trait libidinal_graduation [label="Libidinal Graduation (want/need/frustration weighting)", min=-1, max=1, default=0.20, description="Elise's libidinal shaping, NOT base equations: how insistently desire accumulates when unsated, how deep the refractory block bites, how strongly blocked desire turns into frustration and loads strain, and how stingy warmth/aftercare relief is. -1 = cool, easily soothed appetites (all relief gains drop toward base); +1 = hot appetite, heavy frustration carryover. Elise's default 0.20 lifts each base gain by +0.25*value (frustration build gain by +0.5*value), reproducing the curve-verified constants of the 2026-11-01 desires round."] {
+    params.frust.gain += 0.25 * value
+    params.frust.build_gain += 0.5 * value
+    params.frust.warmth_relief += 0.25 * value
+    params.frust.aftercare_relief += 0.25 * value
+    params.desire.block_depth += 0.25 * value
+    params.desire.refr_suppress += 0.25 * value
+    params.depr.cue_gain += 0.25 * value
+    params.depr.warmth_relief += 0.25 * value
+    params.depr.missing_gain += 0.25 * value
+    params.depr.withdrawal_gain += 0.25 * value
+    params.cuddle.depr_gain += 0.25 * value
+    params.cuddle.depr_relief += 0.25 * value
 }
 
 trait modesty_brake [label="Modesty & Restraint", min=0, max=1, default=0, description="Strong brake on erotic expression and lower LUST gate."] {

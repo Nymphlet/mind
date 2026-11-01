@@ -83,10 +83,13 @@ param env.start_doy = 288          [label="Start day of year", min=1, max=365, s
 param env.weather_sens = 0.22      [label="Weather & baro sensitivity", min=-0.6, max=0.6, step=0.02, description="How strongly overcast skies and barometric drops affect mood (+ = gloomy in storms, - = cozy in rain)."]
 
 group "Endocrine & Intimacy"
-param cycle.strength = 0.0         [label="Cycle strength (0=off, 1=full)", min=0, max=1, step=0.05, description="Master amplitude of the 28-day estrogen/progesterone/androgen/withdrawal cycle."]
-param cycle.length = 28.0          [label="Cycle length (days)", min=21, max=35, step=0.5, description="Duration of one full endocrine cycle in days."]
-param cycle.start_day = 3.0        [label="Cycle day at t=0", min=0, max=35, step=1, description="Starting day within the endocrine cycle at t=0."]
-param cycle.withdrawal_sens = 0.40 [label="Luteal withdrawal sensitivity", min=0, max=1, step=0.05, description="Sensitivity to late-luteal hormone drop (days 25..28)."]
+param cycle.strength = 0.0         [label="Cycle strength (0=off, 1=full)", min=0, max=1, step=0.05, description="Master amplitude of the mechanized ovarian cycle (E2/LH/ovulation/corpus luteum/P4/T/withdrawal)."]
+param cycle.length = 28.0          [label="Nominal Cycle Length (days)", min=21, max=35, step=0.5, description="Nominal endocrine cycle length in days. Real cycles vary 21-35 d; realized length = actual rupture day + luteal length, because the follicular phase carries all the variability (ovu_plan jitter) while the luteal phase stays near-constant."]
+param cycle.start_day = 3.0        [label="Cycle day at t=0", min=0, max=35, step=1, description="Starting day within the endocrine cycle at t=0 (matches the day-clock initial of 3.0; also offsets the follicular-jitter noise timeline)."]
+param cycle.luteal_len = 14.0      [label="Luteal Phase Length (days)", min=11, max=17, step=0.5, description="Days from ovulation to next menses. Biologically near-constant 12-14 d (range 11-17); <11 is luteal phase deficiency."]
+param cycle.withdrawal_sens = 0.40 [label="Luteal withdrawal sensitivity", min=0, max=1, step=0.05, description="Gain on the steroid-DECLINE-RATE withdrawal signal (symptom onset tracks the slope of hormone fall, not absolute levels)."]
+param cycle.tracked_day = -1       [label="Externally tracked cycle day (-1=off)", min=-1, max=35, step=1, description="PLACEHOLDER external trigger: user-tracked cycle day (future daemon/HTTP feed). When >= 0, cycle.day syncs gently toward it."]
+param cycle.lh_strip = -1          [label="External LH strip level (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external trigger: urinary LH predictor kit reading (future ingest feed). When >= 0 it drives the LH surge leaf from outside."]
 param lust.gate = 1.0              [label="Intimacy master gate", min=0, max=2, step=0.05, description="Top-level multiplier on latent romantic/erotic desire (0 disables intimacy)."]
 param lust.salience_base = 0.16    [label="Romantic salience setpoint", min=0, max=1, step=0.05, description="Resting baseline for dopaminergic romantic/erotic wanting."]
 param lust.receptivity_base = 0.26 [label="Intimate receptivity setpoint", min=0, max=1, step=0.05, description="Resting baseline for affiliative openness to intimacy."]
@@ -335,30 +338,80 @@ state env [label="Astronomical & Seasonal Reference", min=-1, max=1, unit="geo",
 }
 
 state cycle [label="Endocrine Cycle", min=-0.5, max=1, unit="hormone", visible=false] {
+    # Mechanized ovarian cycle: slow hormonal STATES (E2, P4, T) driven by follicle
+    # and corpus-luteum timelines, plus FAST event spikes (LH surge, rupture flag) via
+    # E2-positive-feedback autocatalysis. Withdrawal reads the steroid DECLINE RATE.
+    # Timescales: follicular E2 ramp ~1 d tc; LH surge rise ~15-25 h, decay ~10 h;
+    # rupture 10-16 h after LH peak; P4 rise 1-2 d, plateau, collapse 2-3 d; T ~days.
 
-    day [min=0, max=40, label="Cycle Day", visible=false, description="Current day in the personal endocrine cycle."] =
-        mod(t / 1440 + params.cycle.start_day, params.cycle.length)
+    ovu_plan [min=0, max=40, label="Planned Ovulation Day", visible=false, description="Expected ovulation day = cycle length minus luteal length plus slow follicular-length jitter (±2 d). Real cycle variability lives in the follicular phase; the luteal phase stays near-constant, so the realized cycle length = rupture day + luteal length."] =
+        clamp(params.cycle.length - params.cycle.luteal_len + 2.0 * pink_noise(t / 1440 + params.cycle.start_day, 13.0, 3.7), 2, max(params.cycle.length - 8, 4))
+
+    luteal_end [min=0, max=50, label="Menses Due Day", visible=false, description="Day the next menses is due: planned ovulation + luteal length, switching to the ACTUAL rupture day once ovulation latches (> 2.0, immune to reset residual), so the luteal phase holds its length no matter when the surge landed."] =
+        (if cycle.ovu_actual > 2.0 then cycle.ovu_actual else cycle.ovu_plan) + params.cycle.luteal_len
+
+    menses_gate' [initial=0.0, min=0, max=1, label="Menses Trigger (latch)", visible=false, description="Latches when cycle.day has reached the menses-due day and HOLDS through the reset (self-hold while > 0.5), releasing only once the day clock is back below 1.0 — so the day reset can't stall half-way. Drives the clock reset and event-flag clears."] =
+        pull(this, (if cycle.day > cycle.luteal_end + 0.2 or (this > 0.5 and cycle.day > 1.0) then 1 else 0), 200)
+
+    day' [initial=3.0, min=0, max=50, label="Cycle Day", visible=false, description="Wrapped cycle-day state clock: advances 1/1440 per minute; the menses trigger holds the clock and pulls it to 0, so the realized cycle length follows the actual rupture day + luteal length. Initial 3.0 matches cycle.start_day. PLACEHOLDER consumer: when cycle.tracked_day >= 0 (external day tracking), pulls toward the tracked day instead."] =
+        (if cycle.menses_gate > 0.5 then pull(this, 0.0, 20) else 1 / 1440)
+        + (if params.cycle.tracked_day >= 0 then pull(this, params.cycle.tracked_day, 300) else 0)
 
     phase [min=0, max=28, label="Canonical Phase", visible=false, description="Cycle day normalized to a 28-day reference template."] =
         cycle.day * 28 / max(params.cycle.length, 1)
 
-    estrogen [min=-0.5, max=0.7, label="Estrogen (E2)", description="Estradiol curve: follicular peak at day 13 + luteal bump at day 21. Lifts mood, curiosity, play, and intimate receptivity."] =
-        params.cycle.strength * (
-            0.65 * bell_periodic(cycle.phase, 13.0, 2.4, 28)
-            + 0.28 * bell_periodic(cycle.phase, 21.0, 3.5, 28)
-            - 0.26
-        )
+    e2_target [min=-0.5, max=0.8, label="Estradiol Target (E2)", visible=false, description="Follicular estradiol ramp (doubles ~every 2-3 d, crosses the LH positive-feedback threshold ~1-2 d before ovulation), then secondary corpus-luteal secretion peaking mid-luteal, declining with luteal regression. The follicular ramp ends at follicular rupture, not with the LH surge."] =
+        params.cycle.strength * max(
+            (1 - cycle.ovulation)
+                * (-0.40 + 1.08 * sigmoid(cycle.day - (cycle.ovu_plan - 4.0), 0, 0.62)),
+            0.55 * cycle.cl - 0.28)
 
-    progesterone [min=-0.4, max=0.8, label="Progesterone (P4)", description="Progesterone curve: luteal dominance peaking at day 21.5. Calms arousal, increases sleep pressure, and boosts cuddly warmth."] =
-        params.cycle.strength * (
-            0.90 * bell_periodic(cycle.phase, 21.5, 3.2, 28) - 0.25
-        )
+    estrogen' [initial=0.0, min=-0.5, max=0.7, label="Estradiol (E2)", description="Estradiol curve: slow follicular ramp to the preovulatory peak, fast crash after the LH surge (hours, not days), secondary mid-luteal rise from the corpus luteum, and premenstrual decline. Lifts mood, curiosity, play, and intimate receptivity."] =
+        params.speed.mid * pull_asym(this, cycle.e2_target, 1100, 560)
 
-    androgen [min=-0.2, max=0.6, label="Ovulatory Surge", visible=false, description="Mid-cycle ovulatory surge around day 13.5. Boosts dominance, SEEKING, and romantic salience."] =
-        params.cycle.strength * (0.70 * bell_periodic(cycle.phase, 13.5, 1.7, 28) - 0.12)
+    lh' [initial=0.0, min=0, max=1.2, label="LH Surge", unit="rel", description="Normalized luteinizing hormone (follicular baseline ~0.05, surge peak ~1.0): GnRH positive-feedback trigger once estradiol is sustained above threshold (real trigger ~200 pg/mL for ~45-50 h), then a self-sustaining plateau — the real surge runs independently of estradiol until follicular rupture, ~30-34 h from onset. Rises ~15-25 h to a peak, decays ~10 h after rupture. External LH-strip readings (cycle.lh_strip >= 0) drive it directly."] =
+        params.speed.fast * (
+            pull(this, 0.0, 900)
+            + (0.02 + this) * sigmoid(cycle.estrogen, 0.50, 10) / 260
+            + (1 - cycle.ovulation) * hill(this, 0.45, 3) * 1.35 / 1440
+            + max(0.0, params.cycle.lh_strip) * (1 - this) / 240)
 
-    withdrawal [min=0, max=1, label="Luteal Withdrawal", description="Late-luteal rapid hormone withdrawal (days 25..28). Heightens affective sensitivity, fatigue, and need for cozy reassurance."] =
-        params.cycle.strength * params.cycle.withdrawal_sens * bell_periodic(cycle.phase, 26.8, 2.0, 28)
+    lh_wave' [initial=0.0, min=0, max=1, label="Surge Integration", visible=false, description="Time-integrated LH above the ovulation threshold; crossing 0.45 means the surge has sustained ~20-30 h, so rupture is due within hours (real: ovulation ~10-16 h after the LH peak). Cleared at the menses trigger so the next cycle's surge re-integrates."] =
+        pull(this, 0.0, 2000) + 0.001 * hill(cycle.lh - 0.45, 0.40, 2)
+        + (if cycle.menses_gate > 0.5 then -this / 24 else 0)
+
+    ovulation' [initial=0.0, min=0, max=1, label="Ovulation (Follicular Rupture)", description="Fast event flag: latches once the integrated LH surge crosses the rupture threshold (~10-16 h after the LH peak) and stays set through the luteal phase; cleared at the menses trigger (day past due +0.2). Starts the corpus-luteum timeline."] =
+        pull(this, (if cycle.lh_wave > 0.45 or this > 0.6 then 1 else 0), 180)
+        + (if cycle.menses_gate > 0.5 then -this / 24 else 0)
+
+    ovu_actual' [initial=0.0, min=0, max=50, label="Ovulation Day (latched)", visible=false, description="Cycle day at which rupture actually occurred: one-shot latch — jumps to cycle.day on the ovulation flag's rising edge (while the flag is under 0.9), holds through the luteal phase, wiped hard by the menses trigger — so the corpus-luteum timeline always anchors to the real rupture day."] =
+        (if cycle.ovulation > 0.5 and cycle.ovulation < 0.9 and cycle.menses_gate < 0.5 then (cycle.day - this) / 4 else 0)
+        + (if cycle.menses_gate > 0.5 then -this / 12 else 0)
+
+    cl' [initial=0.0, min=0, max=1, label="Corpus Luteum", visible=false, description="Corpus-luteum presence (real lifespan ~12-14 d without a conception signal): grows ~1.5 d after rupture, holds the luteal plateau, then regresses over the final ~2 d before the next menses. Estradiol and progesterone both follow it, so the premenstrual hormone fall — and the withdrawal signal — is its decline. Anovulatory cycles never build a luteum, so no luteal phase appears."] =
+        params.speed.slow * pull_asym(this,
+            if cycle.ovulation > 0.5
+                then 1 - hill(cycle.day - (cycle.luteal_end - 3.0), 0.9, 5)
+                else 0,
+            1500, 1100)
+
+    p4_target [min=-0.45, max=0.85, label="Progesterone Target", visible=false, description="Progesterone secretion: flat follicular baseline, a small LH-driven preovulatory wave (~12 h before the surge), the mid-luteal plateau tracking the corpus luteum, and the premenstrual collapse with its regression."] =
+        params.cycle.strength * clamp(-0.28 + 0.95 * cycle.cl + 0.12 * cycle.lh, -0.30, 0.8)
+
+    progesterone' [initial=0.0, min=-0.4, max=0.8, label="Progesterone (P4)", description="Progesterone: follicular baseline, small preovulatory LH wave, sharp 1-2 d rise to a mid-luteal plateau, and a 2-3 d premenstrual collapse as the corpus luteum regresses. Calms arousal, increases sleep pressure, and boosts cuddly warmth."] =
+        params.speed.mid * pull_asym(this, cycle.p4_target, 1200, 1000)
+
+    androgen' [initial=0.0, min=-0.2, max=0.6, label="Androgen (T)", visible=false, description="Testosterone: gradual follicular rise (real swing only ~+25-50%, not the folklore 2x), peaking around the LH-surge day, then a slow decline across the luteal phase. Boosts dominance, SEEKING, and romantic salience."] =
+        params.speed.mid * pull(this, params.cycle.strength * clamp(
+            -0.12 + 0.62 * (sigmoid(cycle.day - (cycle.ovu_plan - 4.5), 0, 0.5)
+                - 0.70 * sigmoid(cycle.day - (cycle.ovu_plan + 7.0), 0, 0.35)),
+            -0.14, 0.55), 2400)
+
+    withdrawal' [initial=0.0, min=0, max=1, label="Luteal Withdrawal", description="Affective-sensitivity signal driven by the RATE of steroid decline (progesterone and estradiol falling toward follicular baseline), not absolute levels: symptom onset tracks the slope of hormone withdrawal and peaks ~1-2 d before menses. Luteal-phase-gated, so the ovulatory E2 transient does not fire it. Heightens affective sensitivity, fatigue, and need for cozy reassurance."] =
+        params.speed.fast * pull(this, params.cycle.withdrawal_sens * clamp(
+            2.2 * max(0.0, cycle.progesterone - cycle.p4_target)
+            + 1.6 * max(0.0, cycle.estrogen - cycle.e2_target), 0, 1)
+            * hill(cycle.day - (if cycle.ovu_actual > 1 then cycle.ovu_actual else cycle.ovu_plan) - 1.5, 1.5, 3), 600)
 
     mood_bias [min=-0.5, max=0.5, label="Cycle Mood Bias", visible=false, description="Net endocrine shift applied to mood target and baseline."] =
         0.35 * cycle.estrogen + 0.12 * cycle.androgen - 0.22 * cycle.progesterone - 0.45 * cycle.withdrawal

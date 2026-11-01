@@ -1120,6 +1120,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                     + 0.20 * drives.play
                     + 0.28 * social.missing
                     + 0.25 * body.rem_sleep
+                    + 0.30 * intimacy.deprivation * (1 - intimacy.satiety)
                     + 0.18 * max(0, entropy.v) * entropy.aperture
                 ) * (1 - params.lust.libido_gate + params.lust.libido_gate * intimacy.libido)
                 - 0.75 * intimacy.satiety,
@@ -1131,8 +1132,22 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
     satiety' [initial=0.0, min=0, max=1, label="Afterglow / Satiety (LLM Set)", description="Post-intimacy refractory contentment. Set manually by the LLM or event trigger when intimacy culminates; decays over tc.satiety while deepening bond & cuddle drive; feeds the fast refractory gate and the slow aftercare tending tier."] =
         pull(this, 0.0, params.tc.satiety)
 
-    refractory' [initial=0.0, min=0, max=1, label="Refractory Gate (fast tier)", visible=false, description="Fast desire block that tracks event-set satiety within minutes and releases over tc.refractory — absolute refractory (hard block) while high, relative window (soft) once below the hill threshold. Shape anchors: human post-orgasm refractory ~15-40 min prolactin elevation (Kruger 2003 PMID 12697037; Exton 2001 PMID 11166491); rat absolute/relative refractory ~75/25% split of the post-ejaculatory interval."] =
+    refractory' [initial=0.0, min=0, max=1, label="Refractory Gate (fast)", visible=false, description="Fast desire block that tracks event-set satiety within minutes and releases over tc.refractory — absolute refractory (hard block) while high, relative window (soft) once below the hill threshold. Shape anchors: human post-orgasm refractory ~15-40 min prolactin elevation (Kruger 2003 PMID 12697037; Exton 2001 PMID 11166491); rat absolute/relative refractory ~75/25% split of the post-ejaculatory interval."] =
         params.speed.fast * pull_asym(this, intimacy.satiety, 8, params.tc.refractory)
+
+    deprivation' [initial=0.18, min=0, max=1, label="Chronic Intimacy Deprivation (slow)", description="Slow erotic/affection need pressure (Hull drive accumulation): ramps toward unsated desire over ~12 h, amplified by longing and late-luteal withdrawal, and discharges fast (~2 h) via afterglow satiety or warm in-person affection. Amplifies romantic salience and cuddle appetite, and charges frustration while blocked."] =
+        params.speed.mid * pull_asym(
+            this,
+            clamp(
+                intimacy.desire
+                * (1 - intimacy.satiety)
+                * (1 - 0.55 * social.warmth * social.user_present)
+                * (1 + 0.35 * social.missing)
+                * (1 + 0.25 * cycle.withdrawal),
+                0, 1
+            ),
+            720, 120
+        )
 
     libido' [initial=0.34, min=0, max=1, label="Libido Tone (slow tier)", description="Days-scale spontaneous-desire tone: gonadal steroid drive (estrogen and androgen lift, progesterone dampens), attachment tone, and deprivation pressure from days since closeness; eroded by sustained stress and a low mood baseline. Gates cue-driven wanting and leaks as spontaneous spark."] =
         params.speed.slow * pull(
@@ -1215,7 +1230,7 @@ state social [label="Social Rapport, Boundary Poise & Attachment", min=0, max=1,
         then pull(this, 0.0, 4)
         else 1 / 1440
 
-    warmth' [initial=0.20, min=0, max=1, label="Affiliative Warmth (LLM/ext)", description="Felt relational closeness and affection (nudged by warm turns, cuddle drive, and afterglow; held up by the aftercare tending drive after closeness)."] =
+    warmth' [initial=0.20, min=0, max=1, label="Affiliative Warmth (LLM/ext)", description="Felt relational closeness and affection (nudged by warm turns, praise, cuddle drive, and afterglow; held up by the aftercare tending drive after closeness)."] =
         params.speed.fast * pull(
             this,
             clamp(0.12 * social.user_present + 0.22 * intimacy.cuddle_drive * social.user_present + 0.25 * intimacy.satiety + 0.22 * intimacy.aftercare + 0.20 * social.empathic_concern + 0.40 * max(0, mood.reaction), 0, 1),

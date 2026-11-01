@@ -38,11 +38,15 @@
     abs: 1, floor: 1, sign: 1, sat: 1, step: 1,
     pow: 2, min: 2, max: 2, mod: 2, clamp: 3
   };
-  // Stateful filter builtins: hidden per-(leaf, call-site) buffers, advanced once per
-  // step() with alpha = 1 - exp(-dt/tau) (exact exponential, dt-aware; no overshoot when
+  // Stateful filter builtins: hidden buffers advanced once per step() with
+  // alpha = 1 - exp(-dt/tau) (exact exponential, dt-aware; no overshoot when
   // dt > tau). ema(x, tau): exponential moving average tracking input x.
   // avg(x, window): boxcar mean of the last window/dt samples. Leaf equations only.
-  var FILTER_SIGNATURES = { ema: 2, avg: 2 };
+  // Optional 3rd argument: a stable string buffer NAME — ema(x, tau, "my_filter") —
+  // so the hidden buffer keys by the name instead of the fragile path#uid call-site
+  // position (reordering equations moves uid-keyed buffers; named buffers do not).
+  var FILTER_SIGNATURES = { ema: 2, avg: 2 };   // min arity
+  var FILTER_MAX_ARITY = { ema: 3, avg: 3 };    // 3rd arg = stable name string literal
   var CONSTANTS = { pi: Math.PI, tau: 2 * Math.PI, e: Math.E };
   var RESERVED = ["if", "then", "else", "and", "or", "not", "true", "false"];
   var BLOCK_KEYWORDS = ["import", "group", "config", "param", "state", "trait", "def", "render"];
@@ -222,6 +226,9 @@
   P.atom = function () {
     var tok = this.next(), kind = tok[0], s = tok[1], ln = tok[2];
     if (kind === "num") return ["num", parseFloat(s)];
+    // String literals are valid ONLY as the stable-name argument of ema()/avg()
+    // (validated in collectFilterSites); evalAst returns them as-is.
+    if (kind === "str") return ["str", s.slice(1, -1), ln];
     if (kind === "name") {
       if (s === "true" || s === "false") return ["num", s === "true" ? 1 : 0];
       if (RESERVED.indexOf(s) >= 0) throw this.err("reserved word " + quote(s) + " used as value", tok);
@@ -811,8 +818,9 @@
         if (!allowFilters) {
           throw new ModelError(fname + "() is allowed only in leaf equations (not in def bodies, trait blocks, or render expressions)", { line: ln, origin: origin, code: "filter_placement" });
         }
-        if (FILTER_SIGNATURES[fname] !== argc) {
-          throw new ModelError(fname + "() expects " + FILTER_SIGNATURES[fname] + " args, got " + argc, { line: ln, origin: origin, code: "arity_error" });
+        var lo = FILTER_SIGNATURES[fname], hi = FILTER_MAX_ARITY[fname];
+        if (argc < lo || argc > hi) {
+          throw new ModelError(fname + "() expects " + lo + (hi > lo ? "-" + hi : "") + " args (last = stable buffer name string), got " + argc, { line: ln, origin: origin, code: "arity_error" });
         }
         return;
       }
@@ -835,8 +843,17 @@
       if (!Array.isArray(node)) return;
       var k = node[0];
       if (k === "call") {
-        if (FILTER_SIGNATURES[node[1]] && node[2].length === FILTER_SIGNATURES[node[1]]) {
-          out.push({ kind: node[1], node: node, line: node[3] });
+        var fmin = FILTER_SIGNATURES[node[1]];
+        if (fmin && node[2].length >= fmin && node[2].length <= FILTER_MAX_ARITY[node[1]]) {
+          var fname = null;
+          if (node[2].length === 3) {
+            var narg = node[2][2];
+            if (!Array.isArray(narg) || narg[0] !== "str" || !narg[1]) {
+              throw new ModelError(node[1] + "() stable name must be a non-empty string literal (\"my_filter\")", { line: node[3], code: "filter_name_type" });
+            }
+            fname = narg[1];
+          }
+          out.push({ kind: node[1], node: node, line: node[3], name: fname });
         }
         node[2].forEach(walk);
       } else if (k === "bin" || k === "cmp") { walk(node[2]); walk(node[3]); }
@@ -893,7 +910,7 @@
     }
 
     var odeOrder = [], viewNodes = [];
-    var filterUid = 0, filterSites = [];
+    var filterUid = 0, filterSites = [], filterNames = Object.create(null);
     doc.order.leaves.forEach(function (path) {
       var lf = doc.leaves[path];
       var rawAst = parseExpr(lf.equation, lf.origin, lf.line);
@@ -912,7 +929,14 @@
       lf.filters = sites.map(function (s) {
         var uid = ++filterUid;
         s.uid = uid; s.leaf = path;
-        filterSites.push({ key: path + "#" + uid, kind: s.kind, leaf: path, uid: uid, line: s.line });
+        var key = s.name || (path + "#" + uid);
+        if (s.name) {
+          if (filterNames[s.name]) {
+            throw new ModelError("duplicate filter buffer name " + quote(s.name) + " (first used at " + filterNames[s.name].leaf + ")", { line: s.line, origin: lf.origin, code: "filter_name_dup" });
+          }
+          filterNames[s.name] = { leaf: path, uid: uid };
+        }
+        filterSites.push({ key: key, kind: s.kind, leaf: path, uid: uid, name: s.name || null, line: s.line });
         return s;
       });
       if (lf.kind === "ode") odeOrder.push(path);
@@ -1039,7 +1063,7 @@
 
     return {
       version: IR_VERSION, config: doc.config, constants: Object.keys(CONSTANTS).sort(),
-      builtins: MATH_SIGNATURES, filterBuiltins: FILTER_SIGNATURES, functions: doc.functions, params: doc.params,
+      builtins: MATH_SIGNATURES, filterBuiltins: FILTER_SIGNATURES, filterMaxArity: FILTER_MAX_ARITY, functions: doc.functions, params: doc.params,
       states: doc.states, leaves: doc.leaves, filterSites: filterSites,
       schedule: { ode_order: odeOrder, view_order: viewOrder },
       traits: doc.traits, renders: doc.renders, order: doc.order
@@ -1090,17 +1114,22 @@
     ir.order.functions.forEach(function (fn) { tagAstKeys(ir.functions[fn].ast); });
     ir.order.leaves.forEach(function (lp) { tagAstKeys(ir.leaves[lp].ast); });
 
-    // Hidden filter buffers: one per (leaf, call-site). Advance order is reverse uid so
-    // nested filters update inner-first (outer sees the freshly advanced inner buffer).
+    // Hidden filter buffers: one per call-site, keyed by the stable NAME when the
+    // call supplies one (ema(x,tau,"name")), else by the legacy path#uid call-site
+    // key. Advance order is reverse uid so nested filters update inner-first (outer
+    // sees the freshly advanced inner buffer). Named defs also register a legacy
+    // path#uid alias so pre-name blobs migrate their buffer values gracefully.
     this.filterDefs = [];
     this.filterByKey = Object.create(null);
+    this.filterLegacyKeys = Object.create(null);
     ir.order.leaves.forEach(function (lp) {
       (ir.leaves[lp].filters || []).forEach(function (site) {
-        var key = lp + "#" + site.uid;
+        var key = site.name || (lp + "#" + site.uid);
         site.node.fkey = key;
-        var item = { key: key, leaf: lp, uid: site.uid, kind: site.kind, input: site.node[2][0], tau: site.node[2][1] };
+        var item = { key: key, leaf: lp, uid: site.uid, kind: site.kind, name: site.name || null, input: site.node[2][0], tau: site.node[2][1] };
         self.filterDefs.push(item);
         self.filterByKey[key] = item;
+        if (site.name) self.filterLegacyKeys[lp + "#" + site.uid] = item;
       });
     });
     this.filterDefs.sort(function (a, b) { return b.uid - a.uid; });
@@ -1149,6 +1178,7 @@
     var k = node[0];
     switch (k) {
       case "num": return node[1];
+      case "str": return node[1];
       case "var": {
         var key = node.key || (node.key = node[1].join("."));
         if (locals && locals[key] !== undefined) return locals[key];
@@ -1263,7 +1293,7 @@
       var e = self.filters[f.key];
       var cur = !e ? null : (f.kind === "ema" ? e.value : (e.samples.length ? e.sum / e.samples.length : null));
       out[f.key] = {
-        kind: f.kind, leaf: f.leaf, uid: f.uid, value: cur,
+        kind: f.kind, leaf: f.leaf, uid: f.uid, name: f.name, value: cur,
         samples: e && e.kind === "avg" ? e.samples.length : undefined
       };
     });
@@ -1306,7 +1336,7 @@
       var vpath = this.viewOrder[v], vleaf = this.ir.leaves[vpath];
       if (vleaf.filters && vleaf.filters.length) {
         // `this` inside a filter leaf's equation = its buffer value at step start
-        var fb = this.filters[vpath + "#" + vleaf.filters[0].uid];
+        var fb = this.filters[vleaf.filters[0].name || (vpath + "#" + vleaf.filters[0].uid)];
         ctx[vpath] = fb ? (fb.kind === "ema" ? fb.value : (fb.samples.length ? fb.sum / fb.samples.length : 0)) : 0;
       }
       var val = checkFinite(this.evalAst(vleaf.ast, ctx, null), "view " + vpath);
@@ -1430,7 +1460,7 @@
     var lf = this.ir.leaves[target];
     if (!lf || lf.kind !== "view" || !(lf.filters || []).length) return null;
     if (lf.filters.length !== 1) return null;
-    return this.filterByKey[target + "#" + lf.filters[0].uid] || null;
+    return this.filterByKey[lf.filters[0].name || (target + "#" + lf.filters[0].uid)] || null;
   };
 
   E.setState = function (target, value) {
@@ -1576,13 +1606,15 @@
     if (blob.params) Object.keys(blob.params).forEach(function (k) { if (self.ir.params[k]) self.setParam(k, blob.params[k]); });
     // Hidden filter buffers: backward compatible (old blobs have no `filters` — buffers
     // then boot-init at the first step) and forward tolerant (unknown/stale keys ignored).
+    // Pre-name blobs keyed by path#uid migrate gracefully into named buffers via the
+    // legacy alias map (values land under the def's CURRENT key, name or uid).
     if (blob.filters && typeof blob.filters === "object") {
       Object.keys(blob.filters).forEach(function (k) {
-        var def = self.filterByKey[k];
+        var def = self.filterByKey[k] || self.filterLegacyKeys[k];
         if (!def) return;
         var v = blob.filters[k];
         if (def.kind === "ema") {
-          if (typeof v === "number" && isFinite(v)) self.filters[k] = { kind: "ema", value: v };
+          if (typeof v === "number" && isFinite(v)) self.filters[def.key] = { kind: "ema", value: v };
         } else if (v && typeof v === "object" && Array.isArray(v.samples)) {
           // explicit `sum` carried in the blob so round-trips are bit-exact
           var s = [];
@@ -1592,14 +1624,14 @@
           }
           if (!s.length) return;
           var rs = typeof v.sum === "number" && isFinite(v.sum) ? v.sum : s.reduce(function (a, b) { return a + b; }, 0);
-          self.filters[k] = { kind: "avg", samples: s, sum: rs };
+          self.filters[def.key] = { kind: "avg", samples: s, sum: rs };
         } else if (Array.isArray(v)) {
           var s2 = [];
           var sum2 = 0;
           for (var j = 0; j < v.length; j++) {
             if (typeof v[j] === "number" && isFinite(v[j])) { s2.push(v[j]); sum2 += v[j]; }
           }
-          if (s2.length) self.filters[k] = { kind: "avg", samples: s2, sum: sum2 };
+          if (s2.length) self.filters[def.key] = { kind: "avg", samples: s2, sum: sum2 };
         }
       });
     }

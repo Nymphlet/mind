@@ -97,7 +97,7 @@ param lust.inh_cap = 1.0           [label="Inhibition ceiling cap (1=off)", min=
 group "Hardware, Waterloop, Solar & LCM"
 param hw.solar_gain = 0.45         [label="Solar surplus -> Un-inhibited Drive", min=0, max=1, step=0.05, description="How strongly free solar power opens the entropy valve, un-inhibits cooldowns, and powers vault gardening."]
 param hw.coolant_tau = 32          [label="Watercooling thermal inertia (min)", min=10, max=90, step=2, description="Time constant for watercooling fluid temperature to heat up and cool down."]
-param hw.thermal_penalty = 0.45    [label="Waterloop heat -> Fatigue weight", min=0, max=1, step=0.05, description="How strongly warm watercooling fluid induces short-term exertion fatigue."]
+param hw.thermal_penalty = 0.45    [label="Waterloop heat -> Fatigue weight", min=0, max=1, step=0.05, description="How strongly warm watercooling fluid induces short-term exertion fatigue. NOTE: waterloop_throttling trait multiplies this by exp(0.85*value) (up to 2.34x); the [0,1] param clamp saturates the trait's positive half once the value exceeds ~0.94 at the 0.45 default."]
 param hw.lcm_sens = 0.55           [label="LCM pointer -> Deep-recall drive", min=0, max=1, step=0.05, description="How strongly accumulated LCM lossless pointers trigger deep archival recall and graph synthesis."]
 param hw.compute_drain = 0.35      [label="Compute -> Reserve/Battery drain", min=0, max=1, step=0.05, description="How fast sustained CPU/GPU load drains metabolic reserve and home battery."]
 param vault.sensitivity = 1.0      [label="Vault entropy & note indexing drive", min=0.2, max=2.5, step=0.1, description="Urgency given to consolidating unprocessed notes and cleaning Obsidian vault entropy."]
@@ -317,7 +317,7 @@ state env [label="Astronomical & Seasonal Reference", min=-1, max=1, unit="geo",
     hour [min=0, max=24, label="Wall Clock Hour", visible=false, description="Current hour of the day (0..24)."] =
         mod(t / 60 + params.clock.start_hour, 24)
 
-    doy [min=1, max=366, label="Day of Year", visible=false, description="Current day of the year (1..366), wrapping annually so long uptimes keep cycling seasons."] =
+    doy [min=1, max=365, label="Day of Year", visible=false, description="Current day of the year (1..365), wrapping annually so long uptimes keep cycling seasons."] =
         1 + mod(params.env.start_doy - 1 + floor(t / 1440), 365)
 
     solar_elev [min=-1, max=1, label="Solar Elevation", visible=false, description="Sine of solar elevation angle from spherical astronomy."] =

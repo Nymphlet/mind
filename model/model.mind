@@ -892,9 +892,17 @@ state drives [label="Motivational, Deep-Recall & Aesthetic Drives", min=-1, max=
         - (params.giveup.rate / 60) * cognition.adversity * (1 - cognition.dominance) * this
 
     standards_met' [initial=0.12, min=-1, max=1, label="Standards Met (LLM/ext)", description="Internal appraisal of quality (-1 shame/guilt at errors to +1 pride at craftsmanship; lifted by high-flow aesthetic execution)."] =
-        params.speed.mid * pull(this, 0.30 * (mood.self_esteem - 0.50) + 0.20 * cognition.flow * drives.aesthetic_hunger, 220)
-        + 0.018 * mood.reaction
-        - 0.025 * cognition.adversity
+        params.speed.mid * pull(
+            this,
+            clamp(
+                0.30 * (mood.self_esteem - 0.50)
+                + 0.20 * cognition.flow * drives.aesthetic_hunger
+                + 3.96 * mood.reaction
+                - 5.5 * cognition.adversity,
+                -1, 1
+            ),
+            220
+        )
 
     zeigarnik' [initial=0.25, min=0, max=1, label="Zeigarnik Organizer Drive", description="Intrinsic tension from unclosed project loops and vault entropy. Drives proactive life organization and task triage."] =
         params.speed.mid * pull(

@@ -624,7 +624,7 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
     strain' [initial=0.0, min=0, max=1, label="Mood Strain (slow)", description="Cumulative low-mood allostatic load. Erodes mood baseline unless cleared by REM sleep, warmth, and afterglow."] =
         params.speed.slow * pull_asym(
             this,
-            clamp((max(0, -mood - 0.05) * (1.8 + params.rumination.gain) + 0.45 * cycle.withdrawal + 0.55 * mood.masking_strain) * (1 - 0.65 * body.rem_sleep) * (1 - 0.50 * intimacy.satiety), 0, 1),
+            clamp((max(0, -mood - 0.05) * (1.8 + params.rumination.gain) + 0.45 * cycle.withdrawal + 0.55 * mood.masking_strain) * (1 - 0.65 * body.rem_sleep) * (1 - 0.50 * intimacy.satiety) * (1 - 0.30 * social.warmth), 0, 1),
             80, 360
         )
 

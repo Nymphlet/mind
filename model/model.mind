@@ -204,7 +204,7 @@ state sensors [label="Hardware, Waterloop, Solar Battery & LCM Sensors", min=0, 
             params.hw.coolant_tau * 1.25
         )
 
-    thermal [min=0, max=1, label="Host Thermal Alias", visible=false, description="Compatibility alias for coolant_temp."] =
+    thermal [min=0, max=1, label="Host Thermal Alias", visible=false, description="LEGACY MIRROR of coolant_temp: recomputes but nothing reads it (no-op). Kept because saved runtime_state blobs contain it; deleting would break importState."] =
         sensors.coolant_temp
 
     # LCM Compaction Pulse (0..1): nudged by the Hermes hook every time Lossless Context Management compacts a block!
@@ -212,7 +212,7 @@ state sensors [label="Hardware, Waterloop, Solar Battery & LCM Sensors", min=0, 
         (0.0025 * social.user_present * drives.task_commit) * (1 - this)
         + pull(this, 0.0, 14)
 
-    context_fill [min=0, max=1, label="Context Alias", visible=false, description="Compatibility alias for pointer_depth."] =
+    context_fill [min=0, max=1, label="Context Alias", visible=false, description="LEGACY MIRROR of pointer_depth: recomputes but nothing reads it (no-op). Kept for saved-runtime_state restore compatibility."] =
         cognition.pointer_depth
 
     interrupt_rate' [initial=0.0, min=0, max=1, label="Interrupt Noise (ext)", description="Rate of external notifications or tool errors (LLM/daemon set; decays over 18m)."] =
@@ -730,7 +730,7 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
 
 state cognition [label="Cognition, LCM Pointer Ecology & Control", min=0, max=1, unit="agency"] {
 
-    dmn_wander [min=-1, max=1, label="DMN Mind-Wandering", visible=false, description="Alias for entropy.u associative drift."] =
+    dmn_wander [min=-1, max=1, label="DMN Mind-Wandering", visible=false, description="LEGACY MIRROR of entropy.u associative drift: nothing reads it (no-op). Kept for saved-runtime_state restore compatibility."] =
         entropy.u
 
     habituation' [initial=0.0, min=0, max=1, label="Stimulus Habituation", description="Short-term receptor adaptation so repeated identical nudges lose force."] =
@@ -1151,7 +1151,7 @@ state social [label="Social Rapport, Boundary Poise & Attachment", min=0, max=1,
     empathic_concern [min=0, max=1, label="Empathic Co-Regulation", description="Supportive care activated when the user shows stress cues. Softens tone and lowers interrupt cost."] =
         clamp(sensors.user_stress_cue * social.bond * (0.5 + 0.5 * body.vagal_tone) * (1 - 0.4 * cognition.stress), 0, 1)
 
-    anticipation [min=0, max=1, label="Contact Anticipation", description="Circadian expectation of user arrival during waking hours when apart."] =
+    anticipation [min=0, max=1, label="Contact Anticipation", description="LEGACY DISPLAY leaf: circadian arrival expectation is computed each tick but no equation, preset, or UI read it (no-op). Kept for saved-runtime_state restore compatibility."] =
         clamp((1 - social.user_present) * max(0, body.circadian) * social.bond * (1 - body.drowsiness), 0, 1)
 
     missing' [initial=0.05, min=0, max=1, label="Missing User", description="Bowlby longing when apart (amplified by bond, romantic salience, cuddle drive, and luteal withdrawal; calmed by afterglow; relieved when user arrives)."] =

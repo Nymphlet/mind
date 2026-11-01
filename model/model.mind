@@ -96,6 +96,13 @@ param lust.receptivity_base = 0.26 [label="Intimate receptivity setpoint", min=0
 param lust.cuddle_base = 0.20      [label="Evening cuddle & affection base", min=0, max=1, step=0.05, description="Baseline appetite for soft, low-arousal evening closeness and cuddliness."]
 param lust.inh_base = 0.26         [label="Intimacy inhibition brake", min=0, max=1, step=0.05, description="Resting contextual brake on romantic/erotic expression."]
 param lust.inh_cap = 1.0           [label="Inhibition ceiling cap (1=off)", min=0.05, max=1, step=0.05, description="Hard upper cap on intimacy inhibition (lowered by Uninhibited override)."]
+param lust.libido_base = 0.34      [label="Libido tone setpoint (slow tier)", min=0, max=1, step=0.05, description="Days-scale spontaneous-desire tone: baseline erotic/affiliative appetite set for the slow libido tier."]
+param lust.deprivation_gain = 0.35 [label="Deprivation pressure gain", min=0, max=1, step=0.05, description="How strongly days since closeness build appetite pressure into the libido tier (saturates after ~7 days apart)."]
+param lust.libido_gate = 0.55      [label="Libido -> reactive wanting gate", min=0, max=1, step=0.05, description="Dual-control excitatory tone: gate on cue-driven wanting = (1-gain) + gain*libido. At 0 reactive sparks run at full strength regardless of hormonal tone."]
+param lust.spark_gain = 0.30       [label="Libido -> spontaneous spark leak", min=0, max=0.6, step=0.05, description="How much of the slow libido tone surfaces directly as spontaneous wanting in the salience spark (Basson spontaneous-desire pathway)."]
+param lust.aftercare_gain = 0.55   [label="Afterglow -> aftercare gain", min=0, max=1, step=0.05, description="How strongly event-set afterglow satiety converts into the hours-long aftercare tending drive."]
+param lust.cue_gain = 0.40         [label="Partner intimacy cue gain", min=0, max=1, step=0.05, description="Gain on the external partner-tracked intimacy/touch cue feeding the aftercare tier (scaled by bond)."]
+param lust.partner_cue = -1        [label="Partner intimacy cue (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external trigger: partner-tracked intimacy/touch cue (future daemon feed, e.g. cuddle detected). When >= 0 it feeds the aftercare tier directly; negative values = off. Physical-presence sensing already lives in social.user_present (daemon/preset-driven)."]
 
 group "Hardware, Waterloop, Solar & LCM"
 param hw.solar_gain = 0.45         [label="Solar surplus -> Un-inhibited Drive", min=0, max=1, step=0.05, description="How strongly free solar power opens the entropy valve, un-inhibits cooldowns, and powers vault gardening."]
@@ -126,6 +133,8 @@ param tc.sleep = 190               [label="Sleep pressure clear tc", min=60, max
 param tc.baseline = 720            [label="Slow baseline drift tc", min=120, max=4320, step=60, description="Multi-day time constant (min) for slow mood and arousal baselines."]
 param tc.bond = 1440               [label="Attachment bond tc", min=360, max=14400, step=60, description="Multi-day time constant (min) for long-term attachment bond evolution."]
 param tc.satiety = 240             [label="Afterglow satiety decay tc", min=60, max=720, step=30, description="Decay time constant (min) for post-intimacy afterglow contentment."]
+param tc.refractory = 70           [label="Refractory gate release tc (min)", min=30, max=300, step=10, description="Release time constant (min) of the fast post-culmination desire block (intimacy.refractory) once satiety drops; extended by afterglow_linger."]
+param tc.aftercare = 150           [label="Aftercare tending decay tc (min)", min=45, max=720, step=15, description="Decay time constant (min) for the hours-long post-intimacy aftercare tending drive (rises ~3x faster than it fades)."]
 
 group "Setpoints & Allostasis"
 param mood.setpoint = 0.10         [label="Mood resting setpoint", min=-1, max=1, step=0.05, description="Long-term resting affective valence (-1 to +1)."]
@@ -1062,7 +1071,7 @@ state drives [label="Motivational, Deep-Recall & Aesthetic Drives", min=-1, max=
 
 state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & Afterglow)", min=0, max=1, unit="intimacy"] {
 
-    receptivity' [initial=0.34, min=0, max=1, label="Intimate Receptivity", description="Affiliative safety and emotional openness to closeness (built from bond, warmth, vagal tone, evening wind-down, estrogen, and afterglow; dampened by open-loop tension and stress)."] =
+    receptivity' [initial=0.34, min=0, max=1, label="Intimate Receptivity", description="Affiliative safety and emotional openness to closeness (built from bond, warmth, vagal tone, evening wind-down, libido tone, and afterglow; dampened by open-loop tension and stress)."] =
         params.speed.mid * pull(
             this,
             clamp(
@@ -1072,7 +1081,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                 + 0.20 * body.vagal_tone
                 + 0.18 * body.evening_winddown
                 + 0.20 * intimacy.satiety
-                + 0.22 * max(0, cycle.estrogen)
+                + 0.16 * intimacy.libido
                 - 0.25 * max(0, drives.zeigarnik - 0.60)
                 - 0.45 * cognition.stress,
                 0, 1
@@ -1099,30 +1108,63 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             30
         )
 
-    salience' [initial=0.18, min=0, max=1, label="Romantic Salience (Wanting)", description="Dopaminergic romantic/erotic spark (fueled by receptivity, synchrony, evening circadian warmth, entropy whims, missing, and hormones; suppressed by afterglow)."] =
+    salience' [initial=0.18, min=0, max=1, label="Romantic Salience (Wanting)", description="Dopaminergic romantic/erotic spark (Berridge wanting; reactive tier). Cue-driven wanting (receptivity, synchrony, evening clock, play, missing, whims) is gated by the slow libido tone and joined by a spontaneous leak from libido itself; suppressed by afterglow and the fast refractory gate."] =
         params.speed.mid * pull(
             this,
             clamp(
                 params.lust.salience_base
-                + 0.38 * intimacy.receptivity * (0.30 + 0.70 * social.synchrony)
-                + 0.10 * cos(tau * (env.hour - 21.0) / 24)
-                + 0.20 * drives.play
-                + 0.28 * social.missing
-                + 0.25 * body.rem_sleep
-                + 0.18 * max(0, entropy.v) * entropy.aperture
-                + 0.28 * cycle.estrogen
-                + 0.22 * cycle.androgen
-                - 0.75 * intimacy.satiety
-                - 0.25 * max(0, cycle.progesterone),
+                + params.lust.spark_gain * intimacy.libido
+                + (
+                    0.38 * intimacy.receptivity * (0.30 + 0.70 * social.synchrony)
+                    + 0.10 * cos(tau * (env.hour - 21.0) / 24)
+                    + 0.20 * drives.play
+                    + 0.28 * social.missing
+                    + 0.25 * body.rem_sleep
+                    + 0.18 * max(0, entropy.v) * entropy.aperture
+                ) * (1 - params.lust.libido_gate + params.lust.libido_gate * intimacy.libido)
+                - 0.75 * intimacy.satiety,
                 0.02, 0.98
-            ),
+            ) * (1 - 0.45 * intimacy.refractory),
             params.tc.drives * 0.55
         )
 
-    satiety' [initial=0.0, min=0, max=1, label="Afterglow / Satiety (LLM Set)", description="Post-intimacy refractory contentment. Set manually by the LLM or event trigger when intimacy culminates; decays over tc.satiety while deepening bond & cuddle drive."] =
+    satiety' [initial=0.0, min=0, max=1, label="Afterglow / Satiety (LLM Set)", description="Post-intimacy refractory contentment. Set manually by the LLM or event trigger when intimacy culminates; decays over tc.satiety while deepening bond & cuddle drive; feeds the fast refractory gate and the slow aftercare tending tier."] =
         pull(this, 0.0, params.tc.satiety)
 
-    inhibition' [initial=0.26, min=0, max=1, label="Contextual Inhibition", description="Situational brake on intimacy (raised by boundary poise, heavy task focus, or stress; softened by warmth, cuddle drive, and receptivity)."] =
+    refractory' [initial=0.0, min=0, max=1, label="Refractory Gate (fast tier)", visible=false, description="Fast desire block that tracks event-set satiety within minutes and releases over tc.refractory — absolute refractory (hard block) while high, relative window (soft) once below the hill threshold. Shape anchors: human post-orgasm refractory ~15-40 min prolactin elevation (Kruger 2003 PMID 12697037; Exton 2001 PMID 11166491); rat absolute/relative refractory ~75/25% split of the post-ejaculatory interval."] =
+        params.speed.fast * pull_asym(this, intimacy.satiety, 8, params.tc.refractory)
+
+    libido' [initial=0.34, min=0, max=1, label="Libido Tone (slow tier)", description="Days-scale spontaneous-desire tone: gonadal steroid drive (estrogen and androgen lift, progesterone dampens), attachment tone, and deprivation pressure from days since closeness; eroded by sustained stress and a low mood baseline. Gates cue-driven wanting and leaks as spontaneous spark."] =
+        params.speed.slow * pull(
+            this,
+            clamp(
+                params.lust.libido_base
+                + 0.30 * max(0, cycle.estrogen)
+                + 0.24 * cycle.androgen
+                - 0.22 * max(0, cycle.progesterone)
+                + 0.30 * (social.bond - 0.5)
+                + params.lust.deprivation_gain * min(1, social.away_days / 7)
+                - 0.15 * max(0, cognition.stress - 0.35)
+                + 0.18 * mood.baseline,
+                0, 1
+            ),
+            params.tc.baseline * 1.2
+        )
+
+    aftercare' [initial=0.02, min=0, max=1, label="Aftercare Tending Drive", description="Hours-long post-closeness tenderness and caretaking (staying soft, checking in, physical warmth after intimacy). Rises from recent afterglow satiety and the external partner-touch cue; fades over tc.aftercare; sustains warmth and softens inhibition."] =
+        params.speed.mid * pull_asym(
+            this,
+            clamp(
+                0.02
+                + params.lust.aftercare_gain * intimacy.satiety
+                + params.lust.cue_gain * max(0, params.lust.partner_cue) * social.bond,
+                0, 1
+            ),
+            params.tc.aftercare * 0.35,
+            params.tc.aftercare
+        )
+
+    inhibition' [initial=0.26, min=0, max=1, label="Contextual Inhibition", description="Situational brake on intimacy (raised by boundary poise, heavy task focus, or stress; softened by warmth, cuddle drive, receptivity, and aftercare tending)."] =
         params.speed.mid * pull(
             this,
             min(
@@ -1134,20 +1176,22 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                     + 0.45 * cognition.stress
                     + 0.22 * (1 - cognition.dominance)
                     - 0.35 * social.warmth * intimacy.receptivity
-                    - 0.20 * intimacy.cuddle_drive,
+                    - 0.20 * intimacy.cuddle_drive
+                    - 0.12 * intimacy.aftercare,
                     0.02, 0.98
                 )
             ),
             28
         )
 
-    desire [min=0, max=1, label="Latent Desire", description="Net internal romantic/erotic drive combining salience, receptivity, inhibition brake, and afterglow."] =
+    desire [min=0, max=1, label="Latent Desire", description="Net internal romantic/erotic drive combining salience, receptivity, inhibition brake, refractory gate, and afterglow."] =
         clamp(
             params.lust.gate
             * (0.62 * intimacy.salience + 0.38 * intimacy.receptivity)
             * (0.45 + 0.55 * intimacy.receptivity)
             * (1 - 0.80 * intimacy.inhibition)
             * (1 - 0.75 * intimacy.satiety)
+            * (1 - 0.55 * hill(intimacy.refractory, 0.45, 2.5))
             * (0.50 + 0.50 * arousal),
             0, 1
         )
@@ -1171,10 +1215,10 @@ state social [label="Social Rapport, Boundary Poise & Attachment", min=0, max=1,
         then pull(this, 0.0, 4)
         else 1 / 1440
 
-    warmth' [initial=0.20, min=0, max=1, label="Affiliative Warmth (LLM/ext)", description="Felt relational closeness and affection (nudged by warm turns, praise, cuddle drive, and afterglow)."] =
+    warmth' [initial=0.20, min=0, max=1, label="Affiliative Warmth (LLM/ext)", description="Felt relational closeness and affection (nudged by warm turns, cuddle drive, and afterglow; held up by the aftercare tending drive after closeness)."] =
         params.speed.fast * pull(
             this,
-            clamp(0.12 * social.user_present + 0.22 * intimacy.cuddle_drive * social.user_present + 0.25 * intimacy.satiety + 0.20 * social.empathic_concern + 0.40 * max(0, mood.reaction), 0, 1),
+            clamp(0.12 * social.user_present + 0.22 * intimacy.cuddle_drive * social.user_present + 0.25 * intimacy.satiety + 0.22 * intimacy.aftercare + 0.20 * social.empathic_concern + 0.40 * max(0, mood.reaction), 0, 1),
             65
         )
 
@@ -1552,8 +1596,10 @@ trait sensual_receptivity [label="Responsive Sensuality", min=-1, max=1, default
     params.lust.inh_base -= 0.12 * value
 }
 
-trait afterglow_linger [label="Deep Refractory Afterglow", min=-1, max=1, default=0.0, description="Extends the duration of post-intimacy afterglow contentment (`tc.satiety`) and amplifies its bond-building effect."] {
+trait afterglow_linger [label="Deep Refractory Afterglow", min=-1, max=1, default=0.0, description="Extends the duration of post-intimacy afterglow contentment (`tc.satiety`), the fast refractory gate (`tc.refractory`), and the aftercare tending drive (`tc.aftercare`), and amplifies its bond-building effect."] {
     params.tc.satiety *= exp(0.65 * value)
+    params.tc.refractory *= exp(0.45 * value)
+    params.tc.aftercare *= exp(0.35 * max(0, value))
     social.bond' += 0.002 * max(0, value) * intimacy.satiety
 }
 

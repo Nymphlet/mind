@@ -317,8 +317,8 @@ state env [label="Astronomical & Seasonal Reference", min=-1, max=1, unit="geo",
     hour [min=0, max=24, label="Wall Clock Hour", visible=false, description="Current hour of the day (0..24)."] =
         mod(t / 60 + params.clock.start_hour, 24)
 
-    doy [min=1, max=366, label="Day of Year", visible=false, description="Current day of the year (1..366)."] =
-        params.env.start_doy + floor(t / 1440)
+    doy [min=1, max=366, label="Day of Year", visible=false, description="Current day of the year (1..366), wrapping annually so long uptimes keep cycling seasons."] =
+        1 + mod(params.env.start_doy - 1 + floor(t / 1440), 365)
 
     solar_elev [min=-1, max=1, label="Solar Elevation", visible=false, description="Sine of solar elevation angle from spherical astronomy."] =
         sin(params.env.lat_deg * pi / 180) * sin(0.4091 * sin(tau * (env.doy - 81) / 365))

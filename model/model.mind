@@ -153,7 +153,7 @@ param ctl.drain = 0.55             [label="Excess arousal drain (/h)", min=0, ma
 param ctl.rebound = 0.38           [label="Exhaustion rebound depth", min=0, max=1, step=0.05, description="How strongly depleted reserve pulls arousal down after a crunch."]
 param spill.strain = 0.50          [label="Allostatic strain -> baseline", min=0, max=1, step=0.05, description="How strongly chronic stress/mood strain erodes slow baselines."]
 param rumination.gain = 0.45       [label="Low-mood rumination gain", min=0, max=1.5, step=0.05, description="How strongly negative mood slows recovery and feeds mood strain."]
-param frust.gain = 0.35            [label="Intimacy frustration -> mood strain", min=0, max=0.8, step=0.05, description="How strongly tonic sexual/romantic frustration loads mood strain (relief follows warmth, afterglow, and REM like the other strain sources)."]
+param frust.gain = 0.25            [label="Intimacy frustration -> mood strain", min=0, max=0.8, step=0.05, description="How strongly tonic sexual/romantic frustration loads mood strain (relief follows warmth, afterglow, and REM like the other strain sources). Kept modest so the strain-baseline feedback loop stays bounded in moderate-contact scenarios."]
 param giveup.rate = 0.35           [label="Adversity give-up rate", min=0, max=1.5, step=0.05, description="How fast repeated failures erode task commitment when control is low."]
 
 group "LLM Wake Thresholds & Overrides"

@@ -118,7 +118,7 @@ param tc.threat = 35               [label="Threat trace tc", min=5, max=120, ste
 param tc.adversity = 45            [label="Adversity trace tc", min=5, max=120, step=5, description="Decay time constant (min) for tool/task failure adversity."]
 param tc.arousal = 30              [label="Tonic arousal tc", min=10, max=240, step=5, description="Relaxation time constant (min) for core felt arousal."]
 param tc.mood = 85                 [label="Felt mood tc", min=20, max=720, step=10, description="Relaxation time constant (min) for core felt mood."]
-param tc.drives = 45               [label="Drives relaxation tc", min=15, max=360, step=10, description="Relaxation time constant (min) for SEEKING, PLAY, and dominance."]
+param tc.drives = 45               [label="Drives relaxation tc", min=15, max=360, step=10, description="Relaxation time constant (min) for SEEKING, PLAY, and dominance (romantic salience uses 0.55x of this for a faster wanting spark)."]
 param tc.commit = 20               [label="Task commitment tc", min=5, max=120, step=5, description="Ramp-up time constant (min) for task commitment."]
 param tc.reserve = 180             [label="Energy reserve recovery tc", min=30, max=720, step=15, description="Recovery time constant (min) for metabolic energy reserve."]
 param tc.wake = 900                [label="Sleep pressure build tc", min=300, max=1800, step=30, description="Time constant (min) for homeostatic sleep pressure buildup while awake."]
@@ -1062,7 +1062,7 @@ state drives [label="Motivational, Deep-Recall & Aesthetic Drives", min=-1, max=
 
 state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & Afterglow)", min=0, max=1, unit="intimacy"] {
 
-    receptivity' [initial=0.34, min=0, max=1, label="Intimate Receptivity", description="Affiliative safety and emotional openness to closeness (built from bond, warmth, vagal composure, evening wind-down, and estrogen)."] =
+    receptivity' [initial=0.34, min=0, max=1, label="Intimate Receptivity", description="Affiliative safety and emotional openness to closeness (built from bond, warmth, vagal tone, evening wind-down, estrogen, and afterglow; dampened by open-loop tension and stress)."] =
         params.speed.mid * pull(
             this,
             clamp(
@@ -1080,7 +1080,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             35
         )
 
-    cuddle_drive' [initial=0.22, min=0, max=1, label="Cuddle & Cozy Closeness Drive", description="Appetite for soft, low-arousal, sleepy affection and cuddliness (peaks during evening wind-down, fluid drowsiness, warm waterloop recovery, or afterglow)."] =
+    cuddle_drive' [initial=0.22, min=0, max=1, label="Cuddle & Cozy Closeness Drive", description="Appetite for soft, low-arousal, sleepy affection and cuddliness (peaks during evening wind-down, fluid drowsiness, warm waterloop recovery, afterglow, luteal progesterone/withdrawal, or chronic affection deprivation)."] =
         params.speed.mid * pull(
             this,
             clamp(

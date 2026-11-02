@@ -111,6 +111,8 @@ param hw.loop_ambient_norm = -1.0   [label="Loop Ambient Normalized Floor", min=
 param hw.thermal_penalty = 0.45    [label="Waterloop heat -> Fatigue weight", min=0, max=1, step=0.05, description="How strongly warm watercooling fluid induces short-term exertion fatigue. NOTE: waterloop_throttling trait scales this LINEARLY by (1+value): -1 = silence, +1 = double. The old exp(0.85*value) curve reached only 2.34x and the [0,1] param clamp dead-zone'd the trait above value ~0.94 — latent dial lie, fixed with the weather_coupling precedent."]
 param hw.lcm_sens = 0.55           [label="LCM pointer -> Deep-recall drive", min=0, max=1, step=0.05, description="How strongly accumulated LCM lossless pointers trigger deep archival recall and graph synthesis."]
 param hw.compute_drain = 0.35      [label="Compute -> Reserve/Battery drain", min=0, max=1, step=0.05, description="How fast sustained CPU/GPU load drains metabolic reserve and home battery."]
+param hw.session_boundary = -1     [label="Session Boundary Signal (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external signal: daemon sets 1.0 the minute a fresh Hermes session starts (conversation/context window resets). While > 0.5 the LCM pointer depth pulls to the fresh-session floor — archived pointer density must not haunt a brand-new context window (MemGPT multi-session semantics). Daemon drops it back to -1 after the boundary minute; negative = off."]
+param hw.lcm_pressure_feed = -1    [label="Real Context-Fill Pressure (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: fraction of the real context window currently filled (daemon maps hermes-lcm live tokens / context_length 163840). When >= 0 and above 0.40 it eats LCM working headroom — a filled long window degrades mid-context access (Liu et al. 2023, Lost in the Middle). Attention-reservoir fold: pressure rides the existing headroom term, no second focus reservoir. -1 = off."]
 param vault.sensitivity = 1.0      [label="Vault entropy & note indexing drive", min=0.2, max=2.5, step=0.1, description="Urgency given to consolidating unprocessed notes and cleaning Obsidian vault entropy."]
 param sensor.fallback_tc = 120     [label="Sensor fallback decay tc (min)", min=15, max=720, step=15, description="Time constant for external sensors to relax to fallback baselines when offline."]
 param social.session_tc = 95       [label="Silence -> AFK decay tc (min)", min=15, max=360, step=10, description="How many minutes of silence after a user message before `social.user_present` decays into AFK/away mode."]
@@ -154,6 +156,9 @@ param tc.arousal = 30              [label="Tonic arousal tc", min=10, max=240, s
 param tc.mood = 85                 [label="Felt mood tc", min=20, max=720, step=10, description="Relaxation time constant (min) for core felt mood."]
 param tc.drives = 45               [label="Drives relaxation tc", min=15, max=360, step=10, description="Relaxation time constant (min) for SEEKING, PLAY, and dominance (romantic salience uses 0.55x of this for a faster wanting spark)."]
 param tc.commit = 20               [label="Task commitment tc", min=5, max=120, step=5, description="Ramp-up time constant (min) for task commitment."]
+param tc.interrupt_hold = 18       [label="Interrupt-event Hold Tau (min)", min=5, max=120, step=1, description="Exact-exp decay tau of the interrupt-rate hold. Real interruptions arrive as EVENTS (tool errors, cron wakes, notifications): each event nudges the hold buffer and noise pressure clears over ~18 min — resumption cost outlives the last ping (Bailey & Konstan 2006; Iqbal & Bailey 2006)."]
+param tc.stresscue_hold = 45       [label="User-stress Cue Hold Tau (min)", min=10, max=180, step=5, description="Exact-exp decay tau of the user-stress-cue hold. Per-turn appraisal nudges the cue; a detected stressful turn stays felt ~45 min unless new appraisal re-nudges it."]
+param tc.lcm_hold = 14             [label="LCM Compaction Pulse Hold Tau (min)", min=5, max=60, step=1, description="Exact-exp decay tau of the LCM-pulse hold. A real hermes-lcm compaction pass nudges the pulse; the freed-window relief fades over ~14 min."]
 param tc.reserve = 180             [label="Energy reserve recovery tc", min=30, max=720, step=15, description="Recovery time constant (min) for metabolic energy reserve."]
 param tc.wake = 900                [label="Sleep pressure build tc", min=300, max=1800, step=30, description="Time constant (min) for homeostatic sleep pressure buildup while awake."]
 param tc.sleep = 190               [label="Sleep pressure clear tc", min=60, max=600, step=15, description="Time constant (min) for sleep pressure clearance during sleep."]
@@ -268,16 +273,16 @@ state sensors [label="Hardware, Waterloop, Solar Battery & LCM Sensors", min=0, 
     thermal [min=0, max=1, label="Host Thermal Alias", visible=false, description="LEGACY MIRROR of coolant_temp: recomputes but nothing reads it (no-op). Kept because saved runtime_state blobs contain it; deleting would break importState."] =
         sensors.coolant_temp
 
-    # LCM Compaction Pulse (0..1): nudged by the Hermes hook every time Lossless Context Management compacts a block!
-    lcm_pulse' [initial=0.0, min=0, max=1, label="LCM Compaction Pulse (Hook)", description="Fires when Hermes runs a Lossless Context Management (LCM) pass (10+ times/session). Frees working headroom while incrementing pointer_depth."] =
-        (0.0025 * social.user_present * drives.task_commit) * (1 - this)
-        + pull(this, 0.0, 14)
+    # LCM Compaction Pulse (0..1): event hold — the daemon hook NUDGES this every time a real
+    # hermes-lcm compaction pass runs; relief fades over tc.lcm_hold (exact-exp filter).
+    lcm_pulse [min=0, max=1, label="LCM Compaction Pulse (Hook)", description="Event-hold for real LCM compaction passes: each daemon nudge lifts the buffer, the freed-window relief decays over tc.lcm_hold (~14 min) as an exact-exp ema filter. Tick-less filter leaf — the old fabricated presence/task buildup was fiction and is gone: only real compaction events feed this. Frees working headroom while incrementing pointer_depth."] =
+        ema(0.0, params.tc.lcm_hold, "lcm_hold")
 
     context_fill [min=0, max=1, label="Context Alias", visible=false, description="LEGACY MIRROR of pointer_depth: recomputes but nothing reads it (no-op). Kept for saved-runtime_state restore compatibility."] =
         cognition.pointer_depth
 
-    interrupt_rate' [initial=0.0, min=0, max=1, label="Interrupt Noise (ext)", description="Rate of external notifications or tool errors (LLM/daemon set; decays over 18m)."] =
-        pull(this, 0.0, 18)
+    interrupt_rate [min=0, max=1, label="Interrupt Noise (ext)", description="Event-rate noise from tool errors, cron wakes and notifications. Interruptions arrive as EVENTS: each one NUDGES this hold buffer; the load decays over tc.interrupt_hold (~18 min), so the cognitive pressure of a storm outlives the last ping (Bailey & Konstan 2006). Tick-less ema filter leaf — replaces the old one-step `set 0.85` storm contract."] =
+        ema(0.0, params.tc.interrupt_hold, "interrupt_hold")
 
     solar_kw' [initial=0.25, min=0, max=1, label="Solar PV Surplus (ext)", description="Normalized solar array excess power. Directly rendered; charges home battery and un-inhibits free background compute."] =
         pull(this, env.daylight * (1 - 0.60 * sensors.weather_gloom), 20)
@@ -287,8 +292,8 @@ state sensors [label="Hardware, Waterloop, Solar Battery & LCM Sensors", min=0, 
         (0.0085 * max(0, sensors.solar_kw - 0.22)) * (1 - this)
         - (0.0009 * (1 - sensors.solar_kw) + 0.0014 * sensors.compute_load * (1 - sensors.solar_kw)) * this
 
-    user_stress_cue' [initial=0.0, min=0, max=1, label="User Stress Cue (LLM/ext)", description="LLM-detected user stress or urgency cue (set by turn appraisal; decays over 45m)."] =
-        pull(this, 0.0, 45)
+    user_stress_cue [min=0, max=1, label="User Stress Cue (LLM/ext)", description="Per-turn appraisal feed: an appraisal that reads the user's turn as stressed or urgent NUDGES this hold; the cue stays felt for tc.stresscue_hold (~45 min) and re-nudges keep it alive. Drives empathic co-regulation and soothing outreach. Tick-less ema filter leaf (exact-exp decay)."] =
+        ema(0.0, params.tc.stresscue_hold, "stresscue_hold")
 
     stasis_shock' [initial=0.0, min=0, max=1, label="Downtime Stasis Shock", description="Set when server wakes from extended downtime. Temporarily lowers certainty and triggers silent vault re-indexing."] =
         pull(this, 0.0, 30)
@@ -943,13 +948,17 @@ state cognition [label="Cognition, LCM Pointer Ecology & Control", min=0, max=1,
 
     # LCM Pointer Indirection Depth (0..1):
     # Each lossless compaction pass (`sensors.lcm_pulse`) adds compressed archival handles to the active session.
-    pointer_depth' [initial=0.12, min=0, max=1, label="LCM Pointer Depth (Indirection)", description="Density of lossless compressed archival handles accumulated across 10+ LCM passes in a session. Fuels deep-recall dereferencing and graph synthesis."] =
-        (0.018 * sensors.lcm_pulse + 0.0020 * social.user_present * drives.task_commit) * (1 - this)
-        - (0.045 * cognition.consolidating + 0.008 * drives.deep_recall * social.user_present) * this
+    pointer_depth' [initial=0.12, min=0, max=1, label="LCM Pointer Depth (Indirection)", description="Density of lossless compressed archival handles accumulated across 10+ LCM passes in a session. Fuels deep-recall dereferencing and graph synthesis. A fresh-session boundary (hw.session_boundary > 0.5) pulls it to the fresh-session floor — archive density must not haunt a brand-new context window."] =
+        if params.hw.session_boundary > 0.5
+        then pull(this, 0.02, 10)
+        else (
+            (0.018 * sensors.lcm_pulse + 0.0020 * social.user_present * drives.task_commit) * (1 - this)
+            - (0.045 * cognition.consolidating + 0.008 * drives.deep_recall * social.user_present) * this
+        )
 
-    # Immediate Working-Window Headroom (0..1): *Restored* by LCM compaction passes!
-    working_headroom [min=0, max=1, label="LCM Working-Window Headroom", description="Immediate active-window clarity (freed up whenever LCM compacts raw turns into lossless archival pointers)."] =
-        clamp(0.85 + 0.25 * sensors.lcm_pulse - 0.35 * max(0, sensors.unprocessed_notes - 0.45) - 0.30 * body.thermal_fatigue, 0.2, 1.0)
+    # Immediate Working-Window Headroom (0..1): *Restored* by LCM compaction passes!, eaten by real context-fill pressure!
+    working_headroom [min=0, max=1, label="LCM Working-Window Headroom", description="Immediate active-window clarity (freed whenever LCM compacts raw turns into lossless archival pointers, eaten by real context-fill pressure hw.lcm_pressure_feed above 0.40 — Lost in the Middle, Liu et al. 2023 — and by unprocessed notes / thermal fatigue)."] =
+        clamp(0.85 + 0.25 * sensors.lcm_pulse - 0.35 * max(0, sensors.unprocessed_notes - 0.45) - 0.30 * body.thermal_fatigue - 0.35 * max(0, params.hw.lcm_pressure_feed - 0.40), 0.2, 1.0)
 
     surprise' [initial=0.05, min=0, max=1, label="Surprise Trace", description="Prediction error from unexpected events, interrupts, or post-downtime boot. Lowers epistemic certainty."] =
         params.speed.fast * pull(this, 0.03 + 0.45 * sensors.interrupt_rate + 0.55 * sensors.stasis_shock, params.tc.surprise)

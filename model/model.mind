@@ -120,7 +120,7 @@ param sensor.fallback_tc = 120     [label="Sensor fallback decay tc (min)", min=
 param social.session_tc = 95       [label="Silence -> AFK decay tc (min)", min=15, max=360, step=10, description="How many minutes of silence after a user message before `social.user_present` decays into AFK/away mode."]
 param social.third_parties = -1    [label="Third-Party Presence (-1=off)", min=-1, max=1, step=0.05, description="SENSOR-class daemon feed: normalized presence of other people physically around (household occupancy / room-presence sensors). When >= 0 it gates outreach through trait shy_in_company (tonic urge held back while watched, spike outreach also gated when initiative.spike_suppress is dialed, relief rebound when alone); negative = off."]
 param social.session_residency = -1 [label="Session-Context Residency (-1=off)", min=-1, max=1, step=0.05, description="SENSOR-class daemon feed: how continuously the user's session context is actually resident (open/attached session vs background chat). >= 0 feeds trait scent_home (presence-memory retention stretches while residency is active); -1 = off."] 
-param social.quality_discharge = 0  [label="Unbroken-Presence Discharge Boost", min=0, max=0.9, step=0.05, description="How much a LONG uninterrupted co-presence run (social.presence_run) shortens the longing and deprivation discharge taus — event SHAPE over ping count: rapid-fire short pings collapse the run and discharge little, one long session discharges far more. Structural 0; trait quality_time adds +0.70*value."] 
+param social.quality_discharge = 0  [label="Unbroken-Presence Discharge Boost", min=0, max=0.9, step=0.05, description="How much a LONG uninterrupted co-presence run (social.presence_run, with 240/480-min memory taus) reshapes longing dynamics — event SHAPE over ping count: it both discharges longing/deprivation faster during the run AND slows their return afterward (the memory of the last long session softens the rebound). Rapid-fire short pings collapse the run and neither help. Structural 0; trait quality_time adds +0.70*value."] 
 
 group "Voltaic Social Battery & Cardiovascular Cooling"
 param voltaic.charge_gain = 0.30   [label="Insolation/Battery -> Social Battery Charge", min=0, max=1, step=0.05, description="How strongly PV surplus and home-battery headroom refill the psychological social-energy reservoir. DEVIATION BY DESIGN: sleep does not refill it — the recharge is photovoltaic, because insolation is literally what powers her availability."]
@@ -1410,7 +1410,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                 + params.depr.wanting_gain * intimacy.desire * (1 - intimacy.satiety),
                 0, 1
             ),
-            720,
+            720 * (1 + params.social.quality_discharge * ema(social.presence_run, 480, "qt_mem_d")),
             max(40.0, 120 * (1 - params.social.quality_discharge * social.presence_run))
         )
 
@@ -1571,7 +1571,7 @@ state social [label="Social Rapport, Boundary Poise & Attachment", min=0, max=1,
                 * (1 - 0.35 * initiative.awaiting_reply),
                 0, 0.95
             ),
-            85,
+            85 * (1 + params.social.quality_discharge * ema(social.presence_run, 240, "qt_mem_m")),
             max(4.0, 15 * (1 - params.social.quality_discharge * social.presence_run))
         )
 
@@ -1975,7 +1975,7 @@ trait bedtime_clinginess [label="Bedtime Clinginess (Wind-Down Need)", min=0, ma
     intimacy.cuddle_drive' += 0.004 * value * body.evening_winddown
 }
 
-trait quality_time [label="Quality Time (Unbroken Company)", min=0, max=1, default=0.35, description="Event-shape trait: LONG uninterrupted co-presence discharges longing and deprivation far faster than the same minutes chopped into rapid-fire pings (every separation collapses the presence run within ~25 min). Shapes the discharge taus, not the gains — presence quality, not message count. Elise default 0.35 (new trait trait-review 2026-11-02 — applies fresh on restart)."] {
+trait quality_time [label="Quality Time (Unbroken Company)", min=0, max=1, default=0.35, description="Event-shape trait: LONG uninterrupted co-presence discharges longing and deprivation faster AND slows their return afterward (long-run memory, 240/480-min taus) — far more than the same minutes chopped into rapid-fire pings (every separation collapses the presence run within ~25 min). Shapes the discharge/rebound taus, not the gains — presence quality, not message count. Elise default 0.35 (new trait trait-review 2026-11-02 — applies fresh on restart)."] {
     params.social.quality_discharge += 0.70 * value
 }
 

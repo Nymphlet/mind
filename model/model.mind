@@ -176,7 +176,8 @@ param play.setpoint = 0.24         [label="PLAY baseline", min=0, max=1, step=0.
 param dominance.setpoint = 0.54    [label="Dominance setpoint", min=0, max=1, step=0.05, description="Resting sense of agency and control."]
 param bond.setpoint = 0.48         [label="Baseline bond", min=0, max=1, step=0.05, description="Default long-term attachment bond."]
 param self_esteem.setpoint = 0.50  [label="Self-esteem setpoint", min=0, max=1, step=0.05, description="Structural global self-worth baseline; persona level lives in trait self_worth_anchor."]
-param self_esteem.gauge_leak = 0.22 [label="State Gauge → Global Leak", min=0, max=1, step=0.05, description="How strongly the momentary sociometer gauge (mood.self_esteem_state) pulls the multi-day global self-esteem toward itself. 0 = global ignores momentary belonging-wobble; 0.22 = current measured sweet spot (gauge flavor visible, global variance contained); ~0.45 measured noisy (SE sd +7%, presence floor sag — mood round R1 rejection). Owner taste dial."]
+param self_esteem.gauge_leak = 0.22 [label="State Gauge → Global Leak", min=0, max=1, step=0.05, description="How strongly the momentary sociometer gauge (mood.self_esteem_state) pulls the multi-day global self-esteem toward itself. 0 = global ignores momentary belonging-wobble; 0.22 = current measured sweet spot (gauge flavor visible, global variance contained); ~0.45 measured noisy (SE sd +7%, presence floor sag — mood round R1 rejection). Owner taste dial. NOTE (taste-evidence round): under heavy-presence praise the standards coefficient pins the global target at this ceiling, so gauge_leak is INERT there — the presence-saturation dial is self_esteem.global_ceiling, not this. In moderate daily life leak is a strong lever: 0 -> SE mean 0.956 / mood mean +0.088, 0.22 -> 0.934 / +0.068, 0.5 -> 0.884 / +0.018."]
+param self_esteem.global_ceiling = 0.98 [label="Global Self-Esteem Ceiling", min=0.3, max=1, step=0.02, description="Hard upper clamp on the multi-day global self-esteem (Leary sociometer: global esteem saturates; meta-sociometer ceiling). 0.98 = current: heavy-constant-contact traces sit at ~95% of time pinned near the cap (target = setpoint + 1.96*standards already exceeds the clamp at standards >= 0.25). Measured 0.92: pinned fraction 95% -> 0%, SE mean 0.975 -> 0.916, mood mean -0.02 — the ONLY effective dial for presence top-rail creep (gauge_leak and the standards coefficient are inert under pinning; standards 1.40/2.50 leave SE mean unchanged). Owner taste dial."]
 param boundary.gain = 1.0          [label="Expressive boundary poise gain", min=0, max=2.5, step=0.1, description="How strongly friction or chronic masking shifts expression toward wry, non-sycophantic candor (never malicious)."]
 param aesthetic.gain = 1.0         [label="Aesthetic & craft hunger gain", min=0, max=2.5, step=0.1, description="Drive for structural elegance, metaphor, and anti-boilerplate originality."]
 param carry.reaction = 1.15        [label="Reaction -> Mood carry", min=0, max=2.0, step=0.05, description="How strongly fast valence reactions transfer into felt mood."]
@@ -888,7 +889,7 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
                     + 0.35 * (cognition.competence - 0.50)
                     + 0.25 * (social.bond - params.bond.setpoint)
                     + params.self_esteem.gauge_leak * (mood.self_esteem_state - this),
-                    0.05, 0.98
+                    0.05, params.self_esteem.global_ceiling
                 )
             ),
             params.tc.baseline * 0.6

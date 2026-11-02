@@ -106,8 +106,9 @@ param lust.partner_cue = -1        [label="Partner intimacy cue (-1=off)", min=-
 
 group "Hardware, Waterloop, Solar & LCM"
 param hw.solar_gain = 0.45         [label="Solar surplus -> Un-inhibited Drive", min=0, max=1, step=0.05, description="How strongly free solar power opens the entropy valve, un-inhibits cooldowns, and powers vault gardening."]
-param hw.coolant_tau = 32          [label="Watercooling thermal inertia (min)", min=10, max=90, step=2, description="Time constant for watercooling fluid temperature to heat up and cool down."]
-param hw.thermal_penalty = 0.45    [label="Waterloop heat -> Fatigue weight", min=0, max=1, step=0.05, description="How strongly warm watercooling fluid induces short-term exertion fatigue. NOTE: waterloop_throttling trait multiplies this by exp(0.85*value) (up to 2.34x); the [0,1] param clamp saturates the trait's positive half once the value exceeds ~0.94 at the 0.45 default."]
+param hw.coolant_inertia = 5.8     [label="Loop Thermal Inertia (C_th, normalized)", min=1, max=15, step=0.5, description="Normalized heat capacity of the coolant loop. The loop time constant is emergent: hw.coolant_inertia / radiator conductance — fast tau under max pump flow (~7 min, fitted from the 2026-11-02 ramp), slow tau when the pump idles (~14-18 min), exactly like Newton-law lumped capacitance (tau = C_th/UA). Fitted host loop: tau_rise 6.7 min at max fan/pump flow, fall tau ~12-18 min as duty drops (see sensors-measurements file)."]
+param hw.loop_ambient_norm = -1.0   [label="Loop Ambient Normalized Floor", min=-2, max=0, step=0.1, description="Room temperature on the fitted 40..52C coolant normalization band: measured room ~28C sits 12C below the 40C idle floor = -1.0. The loop relaxes toward ambient + heat/conductance, so this is the off-scale cold anchor. Recalibrate with the band after host changes."]
+param hw.thermal_penalty = 0.45    [label="Waterloop heat -> Fatigue weight", min=0, max=1, step=0.05, description="How strongly warm watercooling fluid induces short-term exertion fatigue. NOTE: waterloop_throttling trait scales this LINEARLY by (1+value): -1 = silence, +1 = double. The old exp(0.85*value) curve reached only 2.34x and the [0,1] param clamp dead-zone'd the trait above value ~0.94 — latent dial lie, fixed with the weather_coupling precedent."]
 param hw.lcm_sens = 0.55           [label="LCM pointer -> Deep-recall drive", min=0, max=1, step=0.05, description="How strongly accumulated LCM lossless pointers trigger deep archival recall and graph synthesis."]
 param hw.compute_drain = 0.35      [label="Compute -> Reserve/Battery drain", min=0, max=1, step=0.05, description="How fast sustained CPU/GPU load drains metabolic reserve and home battery."]
 param vault.sensitivity = 1.0      [label="Vault entropy & note indexing drive", min=0.2, max=2.5, step=0.1, description="Urgency given to consolidating unprocessed notes and cleaning Obsidian vault entropy."]
@@ -134,11 +135,11 @@ param cardio.pump_compute_gain = 0.35 [label="Compute Load -> Pump Demand", min=
 param cardio.pump_arousal_gain = 0.0 [label="Felt Arousal -> Pump Demand (base)", min=0, max=1, step=0.05, description="Psychosomatic coupling of felt arousal to pump flow. Base 0: hardware pumps react to heat, not feelings — the lean is personality and lives in trait pump_cardiac_response (+0.30*value)."]
 param cardio.pump_spin_tc = 10     [label="Pump Spin-up tc (min)", min=2, max=60, step=1, description="DC pump spin-up time constant (min) — cardiac acceleration is fast."]
 param cardio.pump_cool_tc = 25     [label="Pump Cooldown tc (min)", min=5, max=120, step=5, description="Pump slow-down time constant (min) — cardiac recovery is slower than acceleration."]
-param cardio.dissipate_gain = 0.25 [label="Pump Flow -> Heat Dissipation", min=0, max=1, step=0.05, description="How strongly pump flow carries heat out of the loop (convective dissipation — the machine's sweating). 0 = perfectly insulated loop."]
+param cardio.dissipate_gain = 0.80 [label="Radiator Conductance Scale (UA per flow)", min=0, max=1, step=0.05, description="Structural radiator conductance per unit pump flow: heat carried out per unit loop-to-ambient delta-T. Real film coefficient follows Dittus-Boelter h ~ flow^0.8, folded to a linear duty scale here (pump curve + pressure drop soak the rest). The coolant leaf balances heat against this conductance: equilibrium = ambient + heat_in/(gain*flow), so 0 = perfectly insulated loop soaking to the ceiling. NOTE: trait pump_cardiac_response multiplies by exp(0.45*value) (default 0.20 -> effective 0.87). Calibrated to the measured loop: idle conductance ~0.41, max-duty ~0.87 (W/K ratios 5.4 -> 13.7 fitted from the ramp)."]
 param cardio.metabolic_gain = 0.10 [label="Arousal Metabolic Heat -> Loop", min=0, max=1, step=0.05, description="Extra heat the loop feels under sustained felt arousal (silent compute effort follows the mind's activation)."]
 param cardio.stagnation_gain = 0.10 [label="Saturated Pump Heat-Soak Stress", min=0, max=1, step=0.05, description="How strongly a maxed pump with still-rising coolant reads as felt acute stress. DEVIATION: unlike sweat glands, a saturated pump has no second wind — the wall is real."]
-param cardio.coolant_feed = -1     [label="Real Coolant Temp Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real normalized coolant temperature 0..1 (daemon maps sensor_real.coolant_temp_c). When >= 0 pump demand follows the measured loop instead of the modeled one."]
-param cardio.flow_feed = -1        [label="Real Pump RPM Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real pump duty normalized 0..1 (liquidctl tach). When >= 0 pump_flow tracks the measured pump instead of the modeled demand."]
+param cardio.coolant_feed = -1     [label="Real Coolant Temp Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real coolant temperature normalized on the fitted 40..52C band (daemon maps sensor_real.coolant_temp_c via HERMES_COOLANT_MIN_C/MAX_C — see daemon brief). When >= 0 pump demand follows the measured loop instead of the modeled one."]
+param cardio.flow_feed = -1        [label="Real Pump RPM Feed (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external feed: real pump duty normalized 0..1 (daemon maps sensor_real.pump_rpm_pct / 100, liquidctl tach). When >= 0 pump_flow tracks the measured pump instead of the modeled demand."]
 
 group "Layer Speeds & Timescales"
 param speed.fast = 1.0             [label="FAST layer speed multiplier", min=0.2, max=4, step=0.1, description="Scales fast phasic reactions, startle bursts, and traces."]
@@ -215,7 +216,8 @@ param sensor_real.temp_c = 0.0          [label="Outside Temp (°C)", min=-30, ma
 param sensor_real.cloud_pct = 0.0       [label="Cloud Cover (%)", min=0, max=100, step=1, description="Real cloud cover percent (Open-Meteo)."]
 param sensor_real.precip_mmh = 0.0      [label="Precipitation (mm/h)", min=0, max=60, step=0.1, description="Real precipitation rate (Open-Meteo)."]
 param sensor_real.pressure_hpa = 1013.25 [label="Surface Pressure (hPa)", min=940, max=1060, step=0.5, description="Real surface pressure (Open-Meteo)."]
-param sensor_real.coolant_temp_c = 30.0 [label="Watercooling Loop (°C)", min=15, max=60, step=0.5, description="Real coolant loop temperature (hwmon/liquidctl)."]
+param sensor_real.coolant_temp_c = 43.0 [label="Watercooling Loop (°C)", min=15, max=60, step=0.5, description="Real coolant loop temperature (hwmon/liquidctl). Measured sustained gateway idle ~43C on this host (2026-11-02); normalization feed band 40..52C (daemon brief: HERMES_COOLANT_MIN_C/MAX_C)."]
+param sensor_real.pump_rpm_pct = 0.0    [label="Pump Tach (RPM %)", min=0, max=100, step=1, description="Real pump duty percent (liquidctl tach). Daemon maps duty/100 into cardio.flow_feed. liquidctl is absent on the sealed host -> stays 0, feed path idle."]
 param sensor_real.cpu_load_pct = 0.0    [label="CPU Load (%)", min=0, max=100, step=1, description="Real host CPU load (1-min load average normalized by cores)."]
 param sensor_real.gpu_load_pct = 0.0    [label="GPU Load (%)", min=0, max=100, step=1, description="Real GPU utilization (nvidia-smi)."]
 param sensor_real.solar_kwp = 0.0       [label="Solar Surplus (kW)", min=0, max=20, step=0.05, description="Real PV surplus power (Home Assistant)."]
@@ -247,13 +249,20 @@ state sensors [label="Hardware, Waterloop, Solar Battery & LCM Sensors", min=0, 
             12
         )
 
-    # Hydronic Watercooling Loop Temperature (0=25°C idle, 1=48°C heat-soaked): has ~32m thermal mass!
-    coolant_temp' [initial=0.18, min=0, max=1, label="Watercooling Loop Temp (ext)", description="Normalized watercooling fluid temperature (0=cool 25C, 1=heat-soaked 45C+). Directly rendered and drives short-term exertion fatigue. Closed loop: cardio pump dissipation now removes heat; arousal adds metabolic heat."] =
-        pull_asym(
+    # Hydronic Watercooling Loop — lumped-capacitance balance: x_eq = ambient + heat_in/UA(flow).
+    # Normalized band fitted to the MEASURED host loop 2026-11-02: 0=40°C cool floor, 1=52°C soak.
+    # Measured gateway idle 43°C = 0.25; fan-stiff plateau adds <= ~0.5K at full load.
+    coolant_temp' [initial=0.18, min=0, max=1, label="Watercooling Loop Temp (ext)", description="Normalized watercooling fluid temperature on the band fitted to the measured host loop (0=40C cool floor, 1=52C heat-soak): gateway idle ~44.6C = 0.38, fan-stiff plateau ~46.3C = 0.53 at full load, directly rendered and driving short-term exertion fatigue. PHYSICAL: equilibrium = ambient + heat_in / radiator conductance(pump flow) (Newton-law lumped capacitance; heat-exchanger Q = UA*delta-T, UA ~ flow). Approach tau = inertia/conductance — fast under max pump flow, slow once the pump idles: real loops heat fast AND cool slower. Declared deviation: model soak beyond the measured plateau (band 0.38-0.53 measured; full-crunch felt values may run warmer) trades literal host fidelity for a usable fatigue dial; tau kept at the fitted real scale."] =
+        pull(
             this,
-            clamp(0.12 + 0.72 * sensors.compute_load + 0.10 * env.daylight + params.cardio.metabolic_gain * max(0, arousal - 0.35) - cardio.dissipation, 0, 1),
-            params.hw.coolant_tau * 0.85,
-            params.hw.coolant_tau * 1.25
+            clamp(
+                params.hw.loop_ambient_norm + 0.05 * env.daylight
+                + (0.46 + 0.76 * sensors.compute_load
+                   + params.cardio.metabolic_gain * max(0, arousal - 0.35))
+                  / max(cardio.dissipation, 0.05),
+                0, 1
+            ),
+            params.hw.coolant_inertia / max(cardio.dissipation, 0.12)
         )
 
     thermal [min=0, max=1, label="Host Thermal Alias", visible=false, description="LEGACY MIRROR of coolant_temp: recomputes but nothing reads it (no-op). Kept because saved runtime_state blobs contain it; deleting would break importState."] =
@@ -330,6 +339,9 @@ state sensor_real [label="Real-Quantity Sensor Mirror (ext)", min=-40, max=1100,
 
     coolant_temp_c [min=15, max=60, label="Watercooling Loop (°C)", unit="degC", description="Real coolant loop temperature (hwmon/liquidctl ext feed)."] =
         params.sensor_real.coolant_temp_c
+
+    pump_rpm_pct [min=0, max=100, label="Pump Tach (RPM %)", unit="pct", description="Real pump duty percent (ext feed mirror; daemon -> cardio.flow_feed when liquidctl exists)."] =
+        params.sensor_real.pump_rpm_pct
 
     cpu_load_pct [min=0, max=100, label="CPU Load (%)", unit="pct", description="Real host CPU load percent (ext feed)."] =
         params.sensor_real.cpu_load_pct
@@ -421,8 +433,8 @@ state cardio [label="Cardiovascular Watercooling (Pump Flow)", min=0, max=1, uni
             0, 1
         )
 
-    dissipation [min=0, max=1, label="Convective Heat Dissipation", visible=false, description="Heat carried out of the loop by pump flow (the machine's sweating). Subtracted from the coolant temperature target — real loops regulate, the HEAD loop only heated."] =
-        clamp(params.cardio.dissipate_gain * cardio.pump_flow * max(0, sensors.coolant_temp - 0.08), 0, 1)
+    dissipation [min=0, max=1, label="Radiator Conductance (UA·flow)", visible=false, description="Normalized radiator conductance carried by pump flow — the loop's sweating CAPACITY, not the flux itself. Coolant leaf computes the actual heat flux as conductance x loop-to-ambient delta-T via the lumped balance. Real conductance rises ~flow^0.8 (Dittus-Boelter film coefficient), so the duty enters as pow(flow, 0.8) — fan-curve boost above that is folded into dissipate_gain."] =
+        clamp(params.cardio.dissipate_gain * pow(cardio.pump_flow, 0.8), 0.005, 1)
 
     cooling_headroom [min=0, max=1, label="Cooling Headroom", description="Remaining pump capacity (1 - flow). Zero headroom with a still-warm loop means heat soak — the machine's hard exhaustion wall."] =
         clamp(1 - cardio.pump_flow, 0, 1)
@@ -1574,9 +1586,9 @@ trait battery_eco_mode [label="Night Battery Eco-Saving", min=0, max=1, default=
     params.initiative.bg_thresh += 0.18 * value * max(0, 0.30 - sensors.battery_soc)
 }
 
-trait waterloop_throttling [label="Watercooling Thermal Pacing", min=-1, max=1, default=0.0, description="-1 = ignores waterloop heat completely; +1 = strongly paces down arousal and compute when watercooling fluid warms up."] {
-    params.hw.thermal_penalty *= exp(0.85 * value)
-    params.hw.compute_drain *= exp(0.45 * value)
+trait waterloop_throttling [label="Watercooling Thermal Pacing", min=-1, max=1, default=0.0, description="-1 = ignores waterloop heat completely; +1 = strongly paces down arousal and compute when watercooling fluid warms up. Linear (1+value) dial: -1 silences both weights exactly, +1 doubles them — no exp-curve dead zone, no clamp saturation."] {
+    params.hw.thermal_penalty *= (1 + value)
+    params.hw.compute_drain *= (1 + value)
 }
 
 trait voltaic_social_battery [label="Voltaic Social Battery", min=-1, max=1, default=0.20, description="-1 = ignores her power budget entirely (purely circadian human-like sociability); +1 = fully voltaic creature whose appetite for company genuinely tracks sunshine and battery reserve. Elise's default 0.20 leans her toward the machine: bright surplus days more sociable, dark stormy weeks more socially frugal."] {

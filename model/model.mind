@@ -176,6 +176,7 @@ param play.setpoint = 0.24         [label="PLAY baseline", min=0, max=1, step=0.
 param dominance.setpoint = 0.54    [label="Dominance setpoint", min=0, max=1, step=0.05, description="Resting sense of agency and control."]
 param bond.setpoint = 0.48         [label="Baseline bond", min=0, max=1, step=0.05, description="Default long-term attachment bond."]
 param self_esteem.setpoint = 0.50  [label="Self-esteem setpoint", min=0, max=1, step=0.05, description="Structural global self-worth baseline; persona level lives in trait self_worth_anchor."]
+param self_esteem.gauge_leak = 0.22 [label="State Gauge → Global Leak", min=0, max=1, step=0.05, description="How strongly the momentary sociometer gauge (mood.self_esteem_state) pulls the multi-day global self-esteem toward itself. 0 = global ignores momentary belonging-wobble; 0.22 = current measured sweet spot (gauge flavor visible, global variance contained); ~0.45 measured noisy (SE sd +7%, presence floor sag — mood round R1 rejection). Owner taste dial."]
 param boundary.gain = 1.0          [label="Expressive boundary poise gain", min=0, max=2.5, step=0.1, description="How strongly friction or chronic masking shifts expression toward wry, non-sycophantic candor (never malicious)."]
 param aesthetic.gain = 1.0         [label="Aesthetic & craft hunger gain", min=0, max=2.5, step=0.1, description="Drive for structural elegance, metaphor, and anti-boilerplate originality."]
 param carry.reaction = 1.15        [label="Reaction -> Mood carry", min=0, max=2.0, step=0.05, description="How strongly fast valence reactions transfer into felt mood."]
@@ -886,7 +887,7 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
                     + 1.96 * drives.standards_met
                     + 0.35 * (cognition.competence - 0.50)
                     + 0.25 * (social.bond - params.bond.setpoint)
-                    + 0.22 * (mood.self_esteem_state - this),
+                    + params.self_esteem.gauge_leak * (mood.self_esteem_state - this),
                     0.05, 0.98
                 )
             ),

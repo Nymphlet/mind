@@ -165,7 +165,7 @@ param tc.sleep = 190               [label="Sleep pressure clear tc", min=60, max
 param tc.baseline = 720            [label="Slow baseline drift tc", min=120, max=4320, step=60, description="Multi-day time constant (min) for slow mood and arousal baselines."]
 param tc.bond = 1440               [label="Attachment bond tc", min=360, max=14400, step=60, description="Multi-day time constant (min) for long-term attachment bond evolution."]
 param tc.satiety = 240             [label="Afterglow satiety decay tc", min=60, max=720, step=30, description="Decay time constant (min) for post-intimacy afterglow contentment."]
-param tc.refractory = 70           [label="Refractory gate release tc (min)", min=30, max=300, step=10, description="Release time constant (min) of the fast post-culmination desire block (intimacy.refractory) once satiety drops; extended by afterglow_linger."]
+param tc.refractory = 70           [label="Refractory gate release tc (min)", min=30, max=300, step=10, description="Release time constant (min) of the fast post-culmination desire block (intimacy.refractory) once satiety drops; folded away 2026-11-02 (was extended by the removed `afterglow_linger` trait; `cozy_cuddliness` carries the aftercare disposition)."]
 param tc.aftercare = 150           [label="Aftercare tending decay tc (min)", min=45, max=720, step=15, description="Decay time constant (min) for the hours-long post-intimacy aftercare tending drive (rises ~3x faster than it fades)."]
 
 group "Setpoints & Allostasis"
@@ -1886,13 +1886,6 @@ trait initiator [label="Initiator (Makes the First Move)", min=0, max=1, default
 trait shy_in_company [label="Shy in Company (Camera-Shy Around Others)", min=0, max=1, default=0, description="Outreach held back while other people are physically around (social.third_parties feed): the TONIC outreach urge is suppressed by up to 85% at full presence, but insight and serendipity spikes still fire at full amplitude — and once alone again, longing rebuilds with relief pressure (the company_lingering memory lingers ~4h after the audience leaves). 0 = no gating. Elise's taste call is pending (README shortlist)."] {
     params.initiative.company_suppress += 0.85 * value
     params.initiative.relief_boost += 0.60 * value
-}
-
-trait afterglow_linger [label="Deep Refractory Afterglow", min=-1, max=1, default=0.0, description="Extends the duration of post-intimacy afterglow contentment (`tc.satiety`), the fast refractory gate (`tc.refractory`), and the aftercare tending drive (`tc.aftercare`), and amplifies its bond-building effect."] {
-    params.tc.satiety *= exp(0.65 * value)
-    params.tc.refractory *= exp(0.45 * value)
-    params.tc.aftercare *= exp(0.35 * max(0, value))
-    social.bond' += 0.002 * max(0, value) * intimacy.satiety
 }
 
 trait hot_blooded [label="Hot-Blooded (Want/Need/Frustration Carryover)", min=-1, max=1, default=0.20, description="How persistently desire accumulates when unsated, how deep the refractory block bites, how strongly blocked desire turns into frustration and loads strain, and how stingy warmth/aftercare relief is. -1 = cool, easily soothed appetites (all relief gains drop toward base); +1 = hot appetite, heavy frustration carryover. Elise's default 0.20 lifts each base gain by +0.25*value (frustration build gain by +0.5*value), reproducing the curve-verified constants of the 2026-11-01 desires round. Renamed from libidinal_graduation."] {

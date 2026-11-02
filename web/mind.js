@@ -1598,7 +1598,25 @@
       Object.keys(stateMap).forEach(function (k) {
         var lf = self.ir.leaves[k];
         if (!lf) throw new ModelError("import: unknown leaf " + quote(k), { code: "unknown_ref" });
-        if (lf.kind !== "ode") throw new ModelError("import: " + quote(k) + " is a view", { code: "bad_value" });
+        if (lf.kind !== "ode") {
+          // Leaf-kind migration: an old blob stored this path as ticked state but the leaf
+          // is now a view. If it owns exactly one filter site (the ticked -> tickless ema/avg
+          // conversions) seed the hidden buffer with the stored value so the state survives
+          // the upgrade; view keys that own no filter site are dropped silently. Unknown
+          // leaves still throw.
+          var fdef = self.filterLeafDef(k);
+          if (!fdef) return;
+          var v0 = clampLeaf(checkFinite(Number(stateMap[k]), k), lf);
+          if (fdef.kind === "ema") {
+            self.filters[fdef.key] = { kind: "ema", value: v0 };
+          } else {
+            var n1 = Math.max(1, Math.round(checkFinite(self.evalAst(fdef.tau, self.buildFrame(self.simTime, self.state)), "avg() window") / self.dt));
+            var s1 = new Array(n1);
+            for (var q1 = 0; q1 < n1; q1++) s1[q1] = v0;
+            self.filters[fdef.key] = { kind: "avg", samples: s1, sum: v0 * n1 };
+          }
+          return;
+        }
         self.state[k] = clampLeaf(checkFinite(Number(stateMap[k]), k), lf);
       });
     }

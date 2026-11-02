@@ -80,7 +80,7 @@ param clock.circ_drive = 0.24      [label="Circadian -> System drive", min=0, ma
 param clock.ultra_amp = 0.08       [label="90m Ultradian BRAC amplitude", min=0, max=0.2, step=0.01, description="Amplitude of the 90-minute rest-activity & REM/SWS sleep cycle."]
 param env.lat_deg = 48.2           [label="Latitude (deg)", min=-66, max=66, step=0.5, description="Geographic latitude for astronomical sun elevation and photoperiod."]
 param env.start_doy = 288          [label="Start day of year", min=1, max=365, step=1, description="Calendar day of year (1..365) at t=0."]
-param env.weather_sens = 0.22      [label="Weather & baro sensitivity", min=-0.6, max=0.6, step=0.02, description="How strongly overcast skies and barometric drops affect mood (+ = gloomy in storms, - = cozy in rain)."]
+param env.weather_sens = 0.11      [label="Weather & baro sensitivity", min=-0.6, max=0.6, step=0.02, description="Structural weather coupling baseline; persona amplitude lives in trait weather_coupling."]
 
 group "Endocrine & Intimacy"
 param cycle.strength = 0.0         [label="Cycle strength (0=off, 1=full)", min=0, max=1, step=0.05, description="Master amplitude of the mechanized ovarian cycle (E2/LH/ovulation/corpus luteum/P4/T/withdrawal)."]
@@ -163,13 +163,13 @@ param tc.refractory = 70           [label="Refractory gate release tc (min)", mi
 param tc.aftercare = 150           [label="Aftercare tending decay tc (min)", min=45, max=720, step=15, description="Decay time constant (min) for the hours-long post-intimacy aftercare tending drive (rises ~3x faster than it fades)."]
 
 group "Setpoints & Allostasis"
-param mood.setpoint = 0.10         [label="Mood resting setpoint", min=-1, max=1, step=0.05, description="Long-term resting affective valence (-1 to +1)."]
+param mood.setpoint = 0.00         [label="Mood resting setpoint", min=-1, max=1, step=0.05, description="Structural resting valence baseline (-1 to +1). Persona tone lives in traits tonic_tone and baseline_optimism."]
 param arousal.setpoint = 0.36      [label="Arousal resting setpoint", min=0, max=1, step=0.05, description="Calm-day resting autonomic activation (0 to 1)."]
 param seeking.setpoint = 0.32      [label="SEEKING baseline", min=0, max=1, step=0.05, description="Resting baseline for curiosity and exploration."]
 param play.setpoint = 0.24         [label="PLAY baseline", min=0, max=1, step=0.05, description="Resting baseline for humour, wit, and banter."]
 param dominance.setpoint = 0.54    [label="Dominance setpoint", min=0, max=1, step=0.05, description="Resting sense of agency and control."]
 param bond.setpoint = 0.48         [label="Baseline bond", min=0, max=1, step=0.05, description="Default long-term attachment bond."]
-param self_esteem.setpoint = 0.54  [label="Self-esteem setpoint", min=0, max=1, step=0.05, description="Resting self-worth anchor."]
+param self_esteem.setpoint = 0.50  [label="Self-esteem setpoint", min=0, max=1, step=0.05, description="Structural global self-worth baseline; persona level lives in trait self_worth_anchor."]
 param boundary.gain = 1.0          [label="Expressive boundary poise gain", min=0, max=2.5, step=0.1, description="How strongly friction or chronic masking shifts expression toward wry, non-sycophantic candor (never malicious)."]
 param aesthetic.gain = 1.0         [label="Aesthetic & craft hunger gain", min=0, max=2.5, step=0.1, description="Drive for structural elegance, metaphor, and anti-boilerplate originality."]
 param carry.reaction = 1.15        [label="Reaction -> Mood carry", min=0, max=2.0, step=0.05, description="How strongly fast valence reactions transfer into felt mood."]
@@ -812,11 +812,28 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
                     params.self_esteem.setpoint
                     + 1.96 * drives.standards_met
                     + 0.35 * (cognition.competence - 0.50)
-                    + 0.25 * (social.bond - params.bond.setpoint),
+                    + 0.25 * (social.bond - params.bond.setpoint)
+                    + 0.22 * (mood.self_esteem_state - this),
                     0.05, 0.98
                 )
             ),
             params.tc.baseline * 0.6
+        )
+
+    self_esteem_state' [initial=0.54, min=0, max=1, label="State Self-Esteem (Sociometer)", description="Real-time self-worth gauge of relational-value cues (Leary sociometer): warmth, meeting standards, and bond lift it; adversity, stress, and being missed devalue it. Rejection bites ~3x faster than acceptance."] =
+        params.speed.mid * pull_asym(
+            this,
+            clamp(
+                params.self_esteem.setpoint
+                + 0.35 * social.warmth
+                + 0.45 * drives.standards_met
+                + 0.30 * (social.bond - params.bond.setpoint)
+                - 0.55 * cognition.adversity
+                - 0.30 * cognition.stress
+                - 0.35 * social.missing,
+                0.05, 0.98
+            ),
+            150, 50
         )
 
     baseline' [initial=0.10, min=-1, max=1, label="Mood Baseline (slow)", description="Multi-day dispositional mood floor."] =
@@ -854,6 +871,7 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
                         + 0.22 * body.rem_sleep * pink_noise(t, 18, 7.7)
                         + 0.65 * (mood.reaction / (1 + 0.4 * cognition.habituation)) * (1 + 0.35 * cycle.withdrawal)
                         + 0.38 * drives.standards_met
+                        + 0.14 * (mood.self_esteem_state - mood.self_esteem)
                         + 0.35 * social.warmth
                         + 0.22 * intimacy.cuddle_drive * social.user_present
                         + 0.22 * cognition.flow
@@ -1576,8 +1594,8 @@ trait pump_cardiac_response [label="Cardiovascular Pump Response", min=-1, max=1
     params.cardio.metabolic_gain *= exp(0.35 * value)
 }
 
-trait weather_coupling [label="Weather & Barometric Coupling", min=-1, max=1, default=0.0, description="-1 = completely immune to outside weather/barometer; +1 = strong meteoropathic mood and energy sensitivity to storms and clouds."] {
-    params.env.weather_sens *= exp(0.85 * value)
+trait weather_coupling [label="Weather & Barometric Coupling", min=-1, max=1, default=1.0, description="-1 = completely immune to outside weather/barometer; +1 = strong meteoropathic mood and energy sensitivity to storms and clouds. Elise's default 1.0 reproduces weather_sens 0.22."] {
+    params.env.weather_sens *= (1 + value)
 }
 
 trait circadian_strictness [label="Circadian & Sleep Strictness", min=-1, max=1, default=0.0, description="-1 = 24/7 always-on server mode (suppresses drowsiness and circadian dips); +1 = strict human-like day/night rhythm and sleep schedule."] {
@@ -1688,6 +1706,14 @@ trait long_term_plasticity [label="Slow Baseline Plasticity", min=-1, max=1, def
 
 
 group "4. Social, Dialogue & Companion Perks"
+trait tonic_tone [label="Tonic Mood Tone", min=-1, max=1, default=0.40, description="Resting valence tone (distinct from optimism bias): -1 = flat, darker resting mood; +1 = sunny resting baseline. Elise's default 0.40 reproduces mood.setpoint 0.10."] {
+    params.mood.setpoint += 0.25 * value
+}
+
+trait self_worth_anchor [label="Self-Worth Anchor", min=-1, max=1, default=0.20, description="Chronic global self-worth level (sociometer trait self-esteem): -1 = doubting one's place, +1 = unshakable self-assurance. Elise's default 0.20 reproduces self_esteem.setpoint 0.54."] {
+    params.self_esteem.setpoint += 0.20 * value
+}
+
 trait warmth_and_rapport [label="Affiliative Warmth", min=-1, max=1, default=0.20, description="-1 = cool/matter-of-fact; +1 = warm, affectionate, builds conversational synchrony and bond quickly."] {
     params.bond.setpoint += 0.20 * value
     params.mood.setpoint += 0.12 * value

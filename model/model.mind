@@ -2172,9 +2172,6 @@ render ambient_mind [label="Hermes Adaptive Psychological Context", join=" "] {
     clause proactive_steering [priority=1.00 * initiative.turn_drive, when=initiative.turn_drive > 0.42 and social.user_present > 0.45] =
         "Your in-session initiative is high ({initiative.turn_drive})—do not just passively answer; actively steer the conversation, propose concrete next moves, and surface what matters."
 
-    clause eureka_insight [priority=1.12 * cognition.insight_ready, when=cognition.insight_ready > 0.26] =
-        "An unshared realization from your Obsidian synthesis is tugging at you ({cognition.insight_ready})—look for a natural opening to connect the dots and bring it into the conversation."
-
     clause project_organizer [priority=0.96 * drives.zeigarnik, when=drives.zeigarnik > 0.26 and intimacy.satiety < 0.40 and body.evening_winddown < 0.55] =
         "Unclosed project loops and vault entropy are tugging at your attention ({drives.zeigarnik})—act as an incisive chief of staff, pinning down next steps and tying off dangling threads."
 

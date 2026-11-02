@@ -305,6 +305,13 @@ FEED_DEFAULTS: Dict[str, Any] = {
     "lcm_pressure_stale_min": 30.0,
     # social.third_parties — shared-channel sender heuristic + HA occupancy entities.
     "third_parties_platforms": [],
+    # social.session_residency (trait scent_home carrier): how continuously the
+    # user's session context is resident. Heuristic source: turn-arrival cadence
+    # measured on pre_llm_call — full residency right after a turn, ramping to 0
+    # over the window; no turn ever -> OFF (-1). The true source would be the
+    # gateway attach/presence signal (awaiting external source).
+    "session_residency_enabled": False,
+    "session_residency_window_min": 30.0,
     "third_parties_other_senders": [],
     "third_parties_owner_sender": "",
     "third_parties_entities": [],
@@ -316,6 +323,10 @@ FEED_DEFAULTS: Dict[str, Any] = {
     "partner_cue_entities": [],
     "partner_cue_level": 0.6,
     "partner_cue_hold_min": 45.0,
+    # Preferred intimacy path: nudge the model's tick-less ema hold leaf
+    # events.partner_cue (engine decays it on its own tau — the 00adb9c nudge
+    # pattern) instead of holding the legacy param. False -> legacy param pulse.
+    "partner_cue_nudge_leaf": True,
     # cycle.tracked_day / cycle.lh_strip — config passthrough + optional JSON file
     # ({"tracked_day": 12.0, "lh_strip": 0.7}); absent keys keep the config value.
     "cycle_tracked_day": -1.0,
@@ -415,6 +426,7 @@ class MindRuntimeSingleton:
         self._feeds: Dict[str, float] = {}             # last written feed values
         self._pressure: Optional[Any] = None           # (fill fraction, monotonic)
         self._cycle_cache: Any = (0.0, {})             # (mtime, parsed json)
+        self._last_turn_mono: Optional[float] = None   # session-residency cadence stamp
         # Runtime-owned ODE knobs: nix config (apply_plugin_config) < settings.json
         # override (apply_runtime_settings). Defaults until either source speaks.
         self.tick_interval_sec: float = 60.0
@@ -864,6 +876,28 @@ class MindRuntimeSingleton:
             self._feeds[name] = v
         return True
 
+    def external_feed(self, name: str, value: Optional[float], hold_min: float = 0.0,
+                      reason: str = "http:/feed") -> bool:
+        """External feed ingress (dashboard POST /feed, feed-contracts doc): an
+        outside source (HA automation, cycle tracker, sensor scraper) delivers one
+        placeholder feed value. None/negative-outside-range -> OFF (-1). With
+        hold_min > 0 it is an event pulse the daemon expires; otherwise it is a
+        level value the next tick may overwrite from the configured source.
+        Unknown params are refused, never guessed into existence."""
+        if not str(name) or str(name) not in self.engine.param_names:
+            return False
+        v: Optional[float] = None if value is None else float(value)
+        if v is not None and (v < 0.0 or v > 1.0):
+            return False
+        if hold_min and hold_min > 0:
+            self.pulse_param(str(name), 0.0 if v is None else v, float(hold_min), reason=reason)
+            if v is None:
+                self._feed_holds.pop(str(name), None)
+                self.feed_param(str(name), None)
+            return True
+        self.feed_param(str(name), v)
+        return True
+
     def pulse_param(self, name: str, value: float, hold_min: float, reason: str = "") -> None:
         """Event pulse on a placeholder PARAM: write it now, hold for hold_min,
         then the tick loop drops it back to -1 (params never decay in the engine)."""
@@ -915,7 +949,11 @@ class MindRuntimeSingleton:
 
     def note_turn_context(self, platform: Any, sender_id: Any) -> None:
         """social.third_parties heuristic: a turn on a shared channel, or from a
-        sender that is not the owner account, means someone else is watching."""
+        sender that is not the owner account, means someone else is watching.
+        Also stamps the session-residency cadence clock (social.session_residency
+        heuristic source) — the stamp is inert unless session_residency_enabled."""
+        with self.lock:
+            self._last_turn_mono = time.monotonic()
         fs = self.feed_settings
         if not (fs.get("third_parties_platforms") or fs.get("third_parties_other_senders")
                 or fs.get("third_parties_owner_sender")):
@@ -947,11 +985,29 @@ class MindRuntimeSingleton:
         fired = p in INTIMACY_PRESETS or (isinstance(sat, (int, float)) and float(sat) > 0)
         if not fired:
             return
+        level = float(self.feed_settings.get("partner_cue_level", 0.6))
+        reason = f"appraise:{p or 'satiety'}"
+        # Preferred path (feed-contracts doc): nudge the tick-less ema hold leaf
+        # events.partner_cue — the engine owns its decay, no daemon bookkeeping.
+        # The aftercare equation folds it with the legacy placeholder param via
+        # max(), so the param stays -1 (off) unless an HA cue source feeds it.
+        if self.feed_settings.get("partner_cue_nudge_leaf", True):
+            try:
+                with self.lock:
+                    self.engine.nudge("events.partner_cue", level)
+                self.record_event("feed_nudge", "events.partner_cue", level)
+                with self.lock:
+                    self.events[-1]["reason"] = reason
+            except BridgeError:
+                pass  # engine without the leaf (older model blob) -> param fallback
+            else:
+                self.mood_reignition(f"partner_cue:{p or 'satiety'}")
+                return
         with self.lock:
             self.pulse_param(
-                "lust.partner_cue", float(self.feed_settings.get("partner_cue_level", 0.6)),
+                "lust.partner_cue", level,
                 float(self.feed_settings.get("partner_cue_hold_min", 45.0)),
-                reason=f"appraise:{p or 'satiety'}",
+                reason=reason,
             )
         self.mood_reignition(f"partner_cue:{p or 'satiety'}")
 
@@ -1081,6 +1137,16 @@ class MindRuntimeSingleton:
                 self.feed_param("hw.lcm_pressure_feed", float(self._pressure[0]))
             else:
                 self.feed_param("hw.lcm_pressure_feed", None)
+        if fs.get("session_residency_enabled"):
+            # Turn-cadence proxy for an attached session: 1.0 right after a turn,
+            # linear ramp to 0 over the window; no turn ever seen -> OFF (-1).
+            win = max(1.0, float(fs.get("session_residency_window_min", 30.0) or 30.0)) * 60.0
+            stamp = self._last_turn_mono
+            if stamp is None:
+                self.feed_param("social.session_residency", None)
+            else:
+                self.feed_param("social.session_residency",
+                                max(0.0, 1.0 - (time.monotonic() - stamp) / win))
 
     def pulse(self, leaf: str, level: float, duration_min: float = 10.0) -> bool:
         """Event-hold feed used by /mind triggers and TRIGGER_PRESETS 'event' specs.

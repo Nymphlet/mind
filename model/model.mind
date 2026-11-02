@@ -185,6 +185,25 @@ param ctl.drain = 0.55             [label="Excess arousal drain (/h)", min=0, ma
 param ctl.rebound = 0.38           [label="Exhaustion rebound depth", min=0, max=1, step=0.05, description="How strongly depleted reserve pulls arousal down after a crunch."]
 param spill.strain = 0.50          [label="Allostatic strain -> baseline", min=0, max=1, step=0.05, description="How strongly chronic stress/mood strain erodes slow baselines."]
 param rumination.gain = 0.45       [label="Low-mood rumination gain", min=0, max=1.5, step=0.05, description="How strongly negative mood slows recovery and feeds mood strain."]
+param mood.rise_frac = 0.50        [label="Mood rise tc fraction", min=0.1, max=2, step=0.05, description="Multiplier on tc.mood for felt mood moving UP toward its attractor (recovery from a dip). Baek et al. 2023 (J. Affective Features): slower recovery from negative affect = negative inertia, the strongest daily-depression marker. Trait carrier: mood_inertia."]
+param mood.fall_frac = 0.85        [label="Mood fall tc fraction", min=0.1, max=3, step=0.05, description="Multiplier on tc.mood for felt mood sinking BELOW its attractor (negative reactivity: how fast a dip bites)."]
+param mood.inertia = 0.0           [label="Affective inertia carrier", min=0, max=1, step=0.05, description="Structural resistance of felt mood to change in either direction (Koval 2021 affect dysregulation; Baek 2023 inertia). Base equations stay neutral: 0 = no resistance; traits wire it."]
+param mood.neg_clear = 1.0         [label="Negative reaction clear factor", min=0.2, max=2, step=0.05, description="Multiplier on tc.reaction while NEGATIVE reactions clear (x below 0). Base equation stays neutral at 1.0; below 1 makes dips bite short (the documented valence-duration asymmetry) - a trait-review knob."]
+param mood.pos_persist = 1.0       [label="Positive reaction persistence", min=0.2, max=3, step=0.05, description="Multiplier on tc.reaction while POSITIVE reactions fade (x above 0). Neutral at 1.0; above 1 makes good feelings linger (Fredrickson asymmetry) - a trait-review knob. NOTE: >1 combined with frequent praise accumulates reaction and can pin mood at the +1 rail, so keep it modest."]
+param tc.tone = 4320               [label="Dispositional tone tc (min)", min=480, max=20160, step=240, description="Slowest valence tier: days-scale hedonic set-point dynamics (Bagby 2008 hedonic homeostasis; Reich et al. 2023 set-point adaptation)."]
+param mood.tone_lift_cap = 0.18     [label="Tone lift cap", min=0, max=0.6, step=0.02, description="Symmetric HOMEOSTATIC ceiling on how far good conditions can lift dispositional tone above the structural setpoint (hedonic homeostasis: the set-point resists displacement in BOTH directions, so no permanent euphoria; Bagby 2008)."]
+param mood.tone_erosion_cap = 0.16 [label="Tone erosion cap", min=0, max=0.6, step=0.02, description="Maximum downward erosion of dispositional tone from allostatic strain + chronic stress. Hedonic homeostasis: weathering is BOUNDED and reverses when load clears (Diener 1998 adaptation to chronic stress). Breaks the strain -> tone -> mood runaway."]
+param mood.tone_carry = 0.30       [label="Tone -> Baseline Carry", min=0, max=1, step=0.05, description="How much the protected days-scale dispositional tone offsets the multi-day mood baseline. 0 = tone is decorative (audit finding of this round: the tier existed with zero consumers); neutral small value lets the hedonic set-point actually move felt mood without double-counting the relational/self-worth terms baseline already carries."]
+param mood.tone_stress_gain = 0.06 [label="Chronic stress -> tone erosion", min=0, max=0.3, step=0.01, description="How much sustained cognitive stress weathers the days-scale tone floor (counts toward tone_erosion_cap)."]
+param mood.tone_break = 0.12       [label="Homeostasis break fraction", min=0, max=1, step=0.01, description="Slope of tone erosion BEYOND the defense cap. Cummins SWB homeostasis (HPMood): load inside the set-point range is absorbed by defense; overwhelming load breaks homeostasis and contact with protected mood is lost - the depression analogue. 0 = never break."]
+param mood.tone_depr_gain = 0.25   [label="Chronic deprivation tone load", min=0, max=1, step=0.05, description="How much chronic need pressure (above 0.4) loads the tone homeostat: long absence erodes the dispositional base, not just the felt state."]
+
+param rumination.habitual = 0.0    [label="Habitual rumination carrier", min=0, max=1, step=0.05, description="Trait-wired dispositional tendency to get stuck in self-focused repetitive thought (response style). 0 = neutral equation; traits supply the personality."]
+param rumination.build_tc = 90     [label="Rumination build tc (min)", min=15, max=600, step=15, description="Onset time constant of the repetitive-negative-thought STATE (Nolen-Hoeksema 1991 response-styles theory; Mihail 2025 network study places rsR at the centre of negative-affect amplification)."]
+param rumination.clear_tc = 300    [label="Rumination clear tc (min)", min=30, max=1800, step=30, description="Baseline clearance tc of the rumination state; warmth, REM sleep, and task engagement shorten it (distraction is the RS-R antidote)."]
+param depr.chronic_floor = 0.10    [label="Chronic deprivation floor", min=0, max=0.6, step=0.02, description="Hull (1943) drive-accumulator floor: need pressure that exists independently of acute wanting cues."]
+param depr.chronic_gain = 0.42     [label="Time-since-closeness accumulation gain", min=0, max=1, step=0.05, description="Monotone deprivation buildup with days away (saturates ~7 d). PLATEAU BY DESIGN: continuous absence never lets the need accumulator decay; only the longing amplifier adapts."]
+param depr.wanting_gain = 0.45     [label="Acute wanting -> deprivation", min=0, max=1, step=0.05, description="Latent desire added on top of the chronic accumulator (cue-driven, may habituate)."]
 param frust.gain = 0.20            [label="Intimacy frustration -> mood strain (base)", min=0, max=0.8, step=0.05, description="Baseline load of tonic sexual/romantic frustration on mood strain (relief follows warmth, afterglow, and REM like the other strain sources). NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.25)."]
 param desire.block_depth = 0.50    [label="Refractory desire block depth (base)", min=0, max=1, step=0.05, description="How hard the fast refractory gate blocks conscious desire while high. NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.55)."]
 param desire.refr_suppress = 0.40  [label="Refractory salience suppression (base)", min=0, max=1, step=0.05, description="How far refractory dampens the intrusive want-spike (soft, slower than the conscious block). NOTE: trait hot_blooded adds 0.25*value (default 0.20 -> effective 0.45)."]
@@ -784,15 +803,52 @@ state arousal [label="Autonomic Arousal", min=0, max=1, unit="activation"] {
             this,
             arousal.target,
             params.tc.arousal * 0.40,
-            params.tc.arousal * (1 + params.rumination.gain * max(0, -mood))
+            params.tc.arousal * (1 + params.rumination.gain * (max(0, -mood) + 0.5 * mood.rumination))
         )
         + 1.35 * (params.carry.phasic / params.tc.phasic) * arousal.phasic * (1 - 0.4 * cognition.habituation)
 }
 
 state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] {
 
-    reaction' [initial=0.0, min=-1, max=1, label="Valence Reaction (LLM/ext)", description="Acute emotional reaction to praise, warmth, success, or conflict (nudged by turns; decays over tc.reaction)."] =
-        params.speed.fast * pull(this, 0.0, params.tc.reaction)
+    tone' [initial=0.10, min=-1, max=1, label="Dispositional Tone (days)", description="Slowest valence tier: days-scale hedonic set-point (Bagby 2008 hedonic homeostasis; Reich et al. 2023). Anchored on the structural setpoint plus long-run relational and self-worth state; weathered by allostatic strain, chronic stress and chronic need pressure up to mood.tone_erosion_cap (homeostatic defense) and beyond that cap only at the reduced mood.tone_break slope (Cummins: overwhelming challenges break homeostasis), so a bad stretch cannot permanently sink tone (Diener 1998 adaptation) and it drifts back when load clears."] =
+        params.speed.slow * homeostat(
+            this,
+            max(
+                params.override.mood_floor,
+                clamp(
+                    params.mood.setpoint
+                    + clamp(
+                        0.20 * (social.bond - params.bond.setpoint)
+                        + 0.10 * (ema(mood.self_esteem, params.tc.tone * 0.7, "tone_worth") - 0.50)
+                        + 0.06 * env.seasonal_light
+                        - min(params.mood.tone_erosion_cap,
+                              params.spill.strain * (mood.strain + 0.5 * arousal.strain)
+                          + params.mood.tone_stress_gain * cognition.stress
+                          + params.mood.tone_depr_gain * max(0.0, intimacy.chronic - 0.4)),
+                        -params.mood.tone_erosion_cap, params.mood.tone_lift_cap
+                    )
+                    - max(0.0,
+                          (params.spill.strain * (mood.strain + 0.5 * arousal.strain)
+                          + params.mood.tone_stress_gain * cognition.stress
+                          + params.mood.tone_depr_gain * max(0.0, intimacy.chronic - 0.4))
+                          - params.mood.tone_erosion_cap) * params.mood.tone_break,
+                    -0.95, 0.95
+                )
+            ),
+            params.tc.tone,
+            0.006
+        )
+
+    rumination' [initial=0.0, min=0, max=1, label="Repetitive Negative Thought (RS-R)", description="STATE of sustained self-focused repetitive thought (Nolen-Hoeksema 1991 response-styles theory; Mihail 2025 network evidence). Builds from dysphoria x threat/adversity plus the habitual trait carrier; cleared by warmth, REM sleep, and engagement. Amplifies mood strain, slows mood recovery, and devalues the sociometer."] =
+        params.speed.mid * pull_asym(
+            this,
+            clamp((params.rumination.habitual + params.rumination.gain * max(0, -mood - 0.08)) * (0.35 + 0.45 * cognition.threat + 0.35 * cognition.adversity), 0, 1),
+            params.rumination.build_tc,
+            params.rumination.clear_tc * (1 - 0.5 * social.warmth) * (1 - 0.4 * body.rem_sleep) * (1 - 0.3 * drives.task_commit)
+        )
+
+    reaction' [initial=0.0, min=-1, max=1, label="Valence Reaction (LLM/ext)", description="Acute emotional reaction to praise, warmth, success, or conflict (nudged by turns; decays over tc.reaction). Asymmetric decay: negative reactions clear faster (tc.reaction * mood.neg_clear), positive reactions linger longer (tc.reaction * mood.pos_persist) - the documented valence-duration asymmetry."] =
+        params.speed.fast * pull_asym(this, 0.0, params.tc.reaction * params.mood.neg_clear, params.tc.reaction * params.mood.pos_persist)
 
     momentum' [initial=0.0, min=-1, max=1, label="Affective Adaptation", visible=false, description="Opponent-process hedonic adaptation trace."] =
         pull(this, mood - mood.baseline, 110)
@@ -816,7 +872,7 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
     strain' [initial=0.0, min=0, max=1, label="Mood Strain (slow)", description="Cumulative low-mood allostatic load. Erodes mood baseline unless cleared by REM sleep, warmth, and afterglow; sexual/romantic frustration loads it via frust.gain."] =
         params.speed.slow * pull_asym(
             this,
-            clamp((max(0, -mood - 0.05) * (1.2 + params.rumination.gain) + 0.45 * cycle.withdrawal + 0.55 * mood.masking_strain + params.frust.gain * intimacy.frustration) * (1 - 0.65 * body.rem_sleep) * (1 - 0.50 * intimacy.satiety) * (1 - 0.30 * social.warmth), 0, 1),
+            clamp((max(0, -mood - 0.05) * (1.2 + params.rumination.gain * (0.5 + 1.5 * mood.rumination)) + 0.45 * cycle.withdrawal + 0.55 * mood.masking_strain + params.frust.gain * intimacy.frustration) * (1 - 0.65 * body.rem_sleep) * (1 - 0.50 * intimacy.satiety) * (1 - 0.30 * social.warmth), 0, 1),
             80, 360
         )
 
@@ -847,19 +903,21 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
                 + 0.30 * (social.bond - params.bond.setpoint)
                 - 0.55 * cognition.adversity
                 - 0.30 * cognition.stress
-                - 0.35 * social.missing,
+                - 0.35 * social.missing
+                - 0.25 * mood.rumination,
                 0.05, 0.98
             ),
             150, 50
         )
 
-    baseline' [initial=0.10, min=-1, max=1, label="Mood Baseline (slow)", description="Multi-day dispositional mood floor."] =
+    baseline' [initial=0.10, min=-1, max=1, label="Mood Baseline (slow)", description="Multi-day dispositional mood floor: the protected tone set-point carried through (mood.tone_carry) plus relational/self-worth/state carry and direct allostatic strain erosion."] =
         params.speed.slow * homeostat(
             this,
             max(
                 params.override.mood_floor,
                 clamp(
                     params.mood.setpoint
+                    + params.mood.tone_carry * mood.tone
                     + 0.65 * cycle.mood_bias
                     + 0.35 * (social.bond - params.bond.setpoint)
                     + 0.38 * (mood.self_esteem - 0.50)
@@ -903,9 +961,10 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
                         - 0.25 * body.thermal_fatigue
                         - 0.25 * max(0, body.sleep_pressure - 0.45)
                         - 0.30 * social.missing
+                        - 0.24 * params.rumination.gain * mood.rumination
                     )
                 ),
-                -1, 1
+                -0.90, 0.90
             )
         )
 
@@ -913,8 +972,8 @@ state mood [label="Affective Mood & Self-Worth", min=-1, max=1, unit="valence"] 
         params.speed.mid * gain_signed(this) * pull_asym(
             this,
             max(params.override.mood_floor, mood.target / (1 + 0.6 * max(0, body.sleep_debt - 0.42))),
-            params.tc.mood * 0.50,
-            params.tc.mood * 0.85
+            params.tc.mood * params.mood.rise_frac * (1 + params.mood.inertia * 1.5 + params.rumination.gain * mood.rumination),
+            params.tc.mood * params.mood.fall_frac * (1 + params.mood.inertia * 1.5)
         )
         + 1.35 * (params.carry.reaction / params.tc.reaction) * mood.reaction * (1 - 0.35 * cognition.habituation)
 
@@ -1289,15 +1348,23 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
     refractory' [initial=0.0, min=0, max=1, label="Refractory Gate (fast)", visible=false, description="Fast desire block that tracks event-set satiety within minutes and releases over tc.refractory — absolute refractory (hard block) while high, relative window (soft) once below the hill threshold. Shape anchors: human post-orgasm refractory ~15-40 min prolactin elevation (Kruger 2003 PMID 12697037; Exton 2001 PMID 11166491); rat absolute/relative refractory ~75/25% split of the post-ejaculatory interval."] =
         params.speed.fast * pull_asym(this, intimacy.satiety, 8, params.tc.refractory)
 
-    deprivation' [initial=0.18, min=0, max=1, label="Chronic Intimacy Deprivation (slow)", description="Slow erotic/affection need pressure (Hull drive accumulation): ramps toward unsated desire over ~12 h, amplified by longing and late-luteal withdrawal, and discharges fast (~2 h) via afterglow satiety or warm in-person affection. Amplifies romantic salience and cuddle appetite, and charges frustration while blocked."] =
+    chronic' [initial=0.18, min=0, max=1, label="Chronic Need Pressure (plateau)", visible=false, description="Hull (1943) drive accumulator proper: monotone time-since-closeness pressure that RISES with away_days (saturates ~7 d), PLATEAUS during continuous absence (never decays while the need is unsated), and clears slowly (~2 d) only once closeness actually resumes. The mid-absence dip in the old feed was the longing amplifier adapting, not the need shrinking."] =
+        params.speed.mid * pull_asym(
+            this,
+            clamp(params.depr.chronic_floor + params.depr.chronic_gain * min(1.0, social.away_days / 7.0), 0, 1),
+            720, 2880
+        )
+
+    deprivation' [initial=0.18, min=0, max=1, label="Chronic Intimacy Deprivation (slow)", description="Slow erotic/affection need pressure (Hull 1943 drive accumulation), two-part: the chronic accumulator (plateaus during continuous absence) amplified by longing and late-luteal withdrawal, plus acute wanting (latent desire) on top which may habituate. Discharges fast (~2 h) via afterglow satiety or warm in-person affection. Amplifies romantic salience and cuddle appetite, and charges frustration while blocked."] =
         params.speed.mid * pull_asym(
             this,
             clamp(
-                intimacy.desire
+                intimacy.chronic
                 * (1 - intimacy.satiety)
                 * (1 - params.depr.warmth_relief * social.warmth * social.user_present)
                 * (1 + params.depr.missing_gain * social.missing)
-                * (1 + params.depr.withdrawal_gain * cycle.withdrawal),
+                * (1 + params.depr.withdrawal_gain * cycle.withdrawal)
+                + params.depr.wanting_gain * intimacy.desire * (1 - intimacy.satiety),
                 0, 1
             ),
             720, 120

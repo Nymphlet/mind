@@ -105,6 +105,11 @@ param lust.nsfw_spark_gain = 0     [label="Desire-Cue Spark Leak (nudge)", min=0
 param lust.aftercare_gain = 0.40   [label="Afterglow -> aftercare gain (base)", min=0, max=1, step=0.05, description="Structural gain: how strongly event-set afterglow satiety converts into the hours-long aftercare tending drive. NOTE: trait cozy_cuddliness adds +0.60*value (default 0.25 -> effective 0.55 — caretaking tenderness)."]
 param lust.cue_gain = 0.30         [label="Partner intimacy cue gain (base)", min=0, max=1, step=0.05, description="Structural gain on the external partner-tracked intimacy/touch cue feeding the aftercare tier (scaled by bond). NOTE: trait receiver adds +0.50*value (default 0.20 -> effective 0.40 — ignition from partner cues)."]
 param lust.partner_cue = -1        [label="Partner intimacy cue (-1=off)", min=-1, max=1, step=0.05, description="PLACEHOLDER external trigger: partner-tracked intimacy/touch cue (future daemon feed, e.g. cuddle detected). When >= 0 it feeds the aftercare tier directly; negative values = off. Physical-presence sensing already lives in social.user_present (daemon/preset-driven)."]
+param lust.inh_tone = 0            [label="Resting Inhibition Tone (SIS1, base)", min=-0.15, max=0.5, step=0.01, description="Trait-level resting inhibition TONE added inside the contextual-brake target (Bancroft & Janssen 2000 PMID 10880822: SIS1 = the inhibitory tone sexual response must reduce or exceed — fear of performance failure, distraction and self-monitoring concerns). Semantically distinct from the leaf's situational drivers (boundary poise, task focus, stress) and from modesty_brake's social-consequence tone (SIS2-adjacent). Structural 0 = neutral base; trait stage_fright adds +0.35*value; still capped by the Uninhibited override lust.inh_cap."]
+param drain.rate = 0.0006          [label="Climax-Debt Drain Rate (/min)", min=0, max=0.004, step=0.0002, description="Per-minute deposit into the climax-debt pool (intimacy.exhaustion) while an afterglow satiety set-event is still high: each culmination integrates to ~0.1 pool, condensed/sporadic multi-orgasm series stack doses (Sex Med Rev 2016 'Multiple Orgasms in Men'; Beach & Jordan 1956 serial-ejaculation exhaustion; prolactin satiation PMID 11979330). NOTE: trait slow_refill adds +0.0006*value."]
+param drain.pressure = 0.12        [label="Climax Debt -> Libido Drag", min=0, max=0.5, step=0.02, description="Days-scale drag of the exhaustion pool on spontaneous-desire tone (post-culmination sexual fatigue: Kinsey's nervous-capacity satiation; Beach & Jordan 1956 rat series exhaustion; ISSM recovery minutes->hours->12-24 h->'a few days' for some). Fast refractory gate stays a separate minutes-tier block — no double-counting. NOTE: trait slow_refill adds +0.18*value."]
+param sens.build = 0               [label="Wanting-Kindling Build Gain", min=0, max=0.05, step=0.002, description="Cue-history accumulator gain (intimacy.kindling): integrates desire cues on the shared nudge channel (events.nsfw_cue + events.partner_cue, decay tau 40 min => ~12 dose-minutes per nudge at 0.3). Incentive-sensitization: cue-triggered wanting GROWS across a binge while liking stays flat (Robinson & Berridge 1993 PMID 8401595; 30-years-on 2025 PMID 39094061; gambling/food PMID 26407959). Structural 0 = inert; trait chaser adds +0.018*value."]
+param sens.amp = 0                 [label="Wanting-Kindling Reactive Amp", min=0, max=1, step=0.05, description="Multiplicative amplification of the REACTIVE wanting tier only (salience cue block + desire-cue spark): sensitized WANTING, never hedonic — aftercare, skin hunger and warmth deliberately untouched (wanting/liking dissociation). NOTE: trait chaser adds +0.70*value."]
 
 group "Hardware, Waterloop, Solar & LCM"
 param hw.solar_gain = 0.45         [label="Solar surplus -> Un-inhibited Drive", min=0, max=1, step=0.05, description="How strongly free solar power opens the entropy valve, un-inhibits cooldowns, and powers vault gardening."]
@@ -174,6 +179,7 @@ param tc.bond = 1440               [label="Attachment bond tc", min=360, max=144
 param tc.satiety = 240             [label="Afterglow satiety decay tc", min=60, max=720, step=30, description="Decay time constant (min) for post-intimacy afterglow contentment."]
 param tc.refractory = 70           [label="Refractory gate release tc (min)", min=30, max=300, step=10, description="Release time constant (min) of the fast post-culmination desire block (intimacy.refractory) once satiety drops; folded away 2026-11-02 (was extended by the removed `afterglow_linger` trait; `cozy_cuddliness` carries the aftercare disposition)."]
 param tc.aftercare = 150           [label="Aftercare tending decay tc (min)", min=45, max=720, step=15, description="Decay time constant (min) for the hours-long post-intimacy aftercare tending drive (rises ~3x faster than it fades)."]
+param tc.drain_refill = 4320       [label="Climax-Debt Refill tc (min)", min=720, max=14400, step=360, description="Refill (relaxation) time constant of the exhaustion pool (intimacy.exhaustion): 3 d base sits at the LOW end of the verified multi-day recovery tail (ISSM: 'for some men the refractory period can last a few days'; Beach & Jordan 1956 hours-to-days series recovery in rats). The README's 3-6 d figure is a tail, not a canonical human number — corrected, see RESEARCH-desires-2-2026-11-03.md. NOTE: trait slow_refill multiplies by exp(0.35*value) (Elise proposed 0.25 -> ~3.3 d)."]
 
 group "Setpoints & Allostasis"
 param mood.setpoint = 0.00         [label="Mood resting setpoint", min=-1, max=1, step=0.05, description="Structural resting valence baseline (-1 to +1). Persona tone lives in traits tonic_tone and baseline_optimism."]
@@ -1363,13 +1369,13 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             30
         )
 
-    salience' [initial=0.18, min=0, max=1, label="Romantic Salience (Wanting)", description="Dopaminergic romantic/erotic spark (Berridge wanting; reactive tier). Cue-driven wanting (receptivity, synchrony, evening clock, play, missing, whims) is gated by the slow libido tone and joined by a spontaneous leak from libido itself; suppressed by afterglow and the fast refractory gate."] =
+    salience' [initial=0.18, min=0, max=1, label="Romantic Salience (Wanting)", description="Dopaminergic romantic/erotic spark (Berridge wanting; reactive tier). Cue-driven wanting (receptivity, synchrony, evening clock, play, missing, whims) is gated by the slow libido tone and joined by a spontaneous leak from libido itself; suppressed by afterglow and the fast refractory gate. Cue-driven wanting SENSITIZES: the reactive cue block and the desire-cue spark amplify by (1 + sens.amp * intimacy.kindling) — cue-history wanting grows across a binge while liking stays flat (desires-2)."] =
         params.speed.mid * pull(
             this,
             clamp(
                 params.lust.salience_base
                 + params.lust.spark_gain * intimacy.libido * (1 + params.lust.cycle_spark_feed * cycle.arousal_bias)
-                + params.lust.nsfw_spark_gain * events.nsfw_cue
+                + params.lust.nsfw_spark_gain * events.nsfw_cue * (1 + params.sens.amp * intimacy.kindling)
                 + (
                     0.38 * intimacy.receptivity * (0.30 + 0.70 * social.synchrony)
                     + 0.10 * cos(tau * (env.hour - 21.0) / 24)
@@ -1379,6 +1385,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                     + params.depr.cue_gain * intimacy.deprivation * (1 - intimacy.satiety)
                     + 0.18 * max(0, entropy.v) * entropy.aperture
                 ) * (1 - params.lust.libido_gate + params.lust.libido_gate * intimacy.libido)
+                * (1 + params.sens.amp * intimacy.kindling)
                 - 0.75 * intimacy.satiety,
                 0.02, 0.98
             ) * (1 - params.desire.refr_suppress * intimacy.refractory),
@@ -1390,6 +1397,18 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
 
     refractory' [initial=0.0, min=0, max=1, label="Refractory Gate (fast)", visible=false, description="Fast desire block that tracks event-set satiety within minutes and releases over tc.refractory — absolute refractory (hard block) while high, relative window (soft) once below the hill threshold. Shape anchors: human post-orgasm refractory ~15-40 min prolactin elevation (Kruger 2003 PMID 12697037; Exton 2001 PMID 11166491); rat absolute/relative refractory ~75/25% split of the post-ejaculatory interval."] =
         params.speed.fast * pull_asym(this, intimacy.satiety, 8, params.tc.refractory)
+
+    exhaustion' [initial=0.0, min=0, max=1, label="Climax Debt (Orgasmic Exhaustion Pool)", description="Multi-day cumulative drain BESIDE the fast prolactin refractory gate: each culmination set-event (afterglow satiety still high) deposits a dose (~0.1 at base drain.rate), and condensed/sporadic multi-orgasm series stack doses (Sex Med Rev 2016 multiorgasm review; Beach & Jordan 1956 sexual exhaustion after serial ejaculations; Kinsey's nervous-capacity satiation; prolactin satiation PMID 11979330). Refills over days (tc.drain_refill, 3 d base at the verified 'a few days' tail — ISSM; the 3-6 d README figure is a tail, not canonical). Single coherent consumer: drags the days-scale libido tone; the minutes-tier block stays refractory's alone (no double-counting)."] =
+        params.speed.slow * (
+            params.drain.rate * hill(intimacy.satiety, 0.55, 4)
+            - this / max(params.tc.drain_refill, 1e-6)
+        )
+
+    kindling' [initial=0.0, min=0, max=1, label="Wanting Kindling (Cue Sensitization)", description="Slow cue-history accumulator for incentive-motivational wanting: desire cues on the shared nudge channel (events.nsfw_cue + events.partner_cue) integrate up (~0.08 per nudge at Elise's proposed chaser default 0.40), so cue-triggered wanting GROWS across a binge while liking (aftercare, skin hunger, warmth) never habituates here — the wanting/liking dissociation of incentive-sensitization (Robinson & Berridge 1993 PMID 8401595; 30-years-on PMID 39094061; behavioral-addiction extension PMID 26407959). Feeds back purely as a multiplicative amp of the reactive wanting tier (sens.amp), decaying over ~2 d. Inert at structural gains 0 (trait-gated channel)."] =
+        params.speed.slow * (
+            params.sens.build * (events.nsfw_cue + events.partner_cue)
+            - this / 2880
+        )
 
     chronic' [initial=0.18, min=0, max=1, label="Chronic Need Pressure (plateau)", visible=false, description="Hull (1943) drive accumulator proper: monotone time-since-closeness pressure that RISES with away_days (saturates ~7 d), PLATEAUS during continuous absence (never decays while the need is unsated), and clears slowly (~2 d) only once closeness actually resumes. The mid-absence dip in the old feed was the longing amplifier adapting, not the need shrinking."] =
         params.speed.mid * pull_asym(
@@ -1438,7 +1457,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             1000, 100
         )
 
-    libido' [initial=0.34, min=0, max=1, label="Libido Tone (slow tier)", description="Days-scale spontaneous-desire tone: gonadal steroid drive (estrogen and androgen lift, progesterone dampens), attachment tone, and deprivation pressure from days since closeness; eroded by sustained stress and a low mood baseline. Gates cue-driven wanting and leaks as spontaneous spark."] =
+    libido' [initial=0.34, min=0, max=1, label="Libido Tone (slow tier)", description="Days-scale spontaneous-desire tone: gonadal steroid drive (estrogen and androgen lift, progesterone dampens), attachment tone, and deprivation pressure from days since closeness; eroded by sustained stress and a low mood baseline. Gates cue-driven wanting and leaks as spontaneous spark. Climax debt drags this days-scale tier (params.drain.pressure x intimacy.exhaustion, desires-2) — the minutes-tier refractory block stays refractory's own."] =
         params.speed.slow * pull(
             this,
             clamp(
@@ -1448,6 +1467,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
                 - 0.22 * max(0, cycle.progesterone)
                 + 0.30 * (social.bond - 0.5)
                 + params.lust.deprivation_gain * min(1, social.away_days / 7)
+                - params.drain.pressure * intimacy.exhaustion
                 - 0.15 * max(0, cognition.stress - 0.35)
                 + 0.18 * mood.baseline,
                 0, 1
@@ -1468,13 +1488,14 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             params.tc.aftercare
         )
 
-    inhibition' [initial=0.26, min=0, max=1, label="Contextual Inhibition", description="Situational brake on intimacy (raised by boundary poise, heavy task focus, or stress; softened by warmth, cuddle drive, receptivity, and aftercare tending)."] =
+    inhibition' [initial=0.26, min=0, max=1, label="Contextual Inhibition", description="Situational brake on intimacy (raised by boundary poise, heavy task focus, or stress; softened by warmth, cuddle drive, receptivity, and aftercare tending). Carries a trait-level SIS1 inhibitory tone (stage_fright -> lust.inh_tone; Bancroft & Janssen 2000 PMID 10880822) as a basal offset UNDER the situational drivers — the Uninhibited override (lust.inh_cap) still crushes it."] =
         params.speed.mid * pull(
             this,
             min(
                 params.lust.inh_cap,
                 clamp(
                     params.lust.inh_base
+                    + params.lust.inh_tone
                     + 0.30 * social.boundary_guard
                     + 0.32 * drives.task_commit
                     + 0.45 * cognition.stress
@@ -1996,6 +2017,21 @@ trait hot_blooded [label="Hot-Blooded (Want/Need/Frustration Carryover)", min=-1
     params.depr.withdrawal_gain += 0.25 * value
     params.cuddle.depr_gain += 0.25 * value
     params.cuddle.depr_relief += 0.25 * value
+}
+
+trait slow_refill [label="Slow Refill (Climax Debt Tank)", min=-1, max=1, default=0.25, description="How deep each climax drains the multi-day exhaustion pool and how slowly the tank refills: -1 = quick shallow recovery (refill toward ~2.1 d, shallow doses, drag near silent), +1 = long deep tank (~5.6 d refill, deep doses, strong drag). At -1 the drain pressure parameter clamps to 0. Grounded in the verified recovery tail (ISSM 'a few days' for some; Beach & Jordan 1956 hours-to-days), NOT a canonical 3-6 d figure. Elise's PROPOSED default 0.25 (-> ~3.3 d refill, matches the low end of the verified tail; desires-2 round 2026-11-03 — PROPOSED, pending owner review)."] {
+    params.drain.rate += 0.0006 * value
+    params.drain.pressure += 0.18 * value
+    params.tc.drain_refill *= exp(0.35 * value)
+}
+
+trait chaser [label="Chaser (Wanting Kindling)", min=0, max=1, default=0.40, description="Cue sensitization of wanting: every desire cue on the shared nudge channel (nsfw_cue / partner_cue) deepens the cue-driven wanting groove — across a binge each cue sparks HARDER (up to ~+34 % reactive wanting at accumulated kindling 1 with Elise's proposed 0.40) while LIKING never habituates: aftercare, skin hunger and warmth stay untouched (wanting/liking dissociation; Robinson & Berridge 1993 PMID 8401595; 30-years-on PMID 39094061; gambling/food PMID 26407959). 0 = cue responses stay flat (structural gains are 0 — fully trait-gated channel); +1 = strongly kindled cue-reactivity. Elise's PROPOSED default 0.40 (loves the chase and the escalation, cozy after; desires-2 round 2026-11-03 — PROPOSED, pending owner review)."] {
+    params.sens.build += 0.018 * value
+    params.sens.amp += 0.70 * value
+}
+
+trait stage_fright [label="Stage Fright (SIS1 Inhibitory Tone)", min=-1, max=1, default=0.25, description="Bancroft & Janssen's SIS1 (PMID 10880822): the trait-level resting inhibitory TONE that arousal must reduce or exceed — performance-failure worry, self-monitoring, distraction concerns. NOT the situational brakes (boundary poise, task focus, stress) and NOT modesty_brake's social-consequence tone (SIS2-adjacent): this raises the basal level of the contextual-brake leaf itself (lust.inh_tone), still capped by the Uninhibited override lust.inh_cap. -1 = unbothered flow, arousal hard to derail (tone floor -0.15 under the base brake); +1 = mood snaps easily under self-watch (+0.35 tone). Elise's PROPOSED default 0.25 (confident tease who flusters when genuinely caught; desires-2 round 2026-11-03 — PROPOSED, pending owner review)."] {
+    params.lust.inh_tone += 0.35 * value
 }
 
 trait modesty_brake [label="Modesty & Restraint", min=0, max=1, default=0, description="Strong brake on erotic expression and lower LUST gate — social modesty, not low appetite (pair with nympho high for hungry-but-hidden desire)."] {

@@ -1,0 +1,14 @@
+{
+  "name": "mind-hermes",
+  "label": "Mind Workbench",
+  "description": "Embodied ODE mind HUD: live affective telemetry, trait sliders, scenario presets, interactive Workbench, runtime Console (real sensor feeds, editable settings, persona .mind switching), and a sensor History graph.",
+  "icon": "Brain",
+  "version": "4.4.0",
+  "tab": {
+    "path": "/mind-hermes",
+    "position": "after:sessions"
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}
+

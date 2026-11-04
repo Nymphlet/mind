@@ -1,0 +1,92 @@
+name: mind-hermes
+version: 4.0.0
+description: Embodied ODE mind architecture with waterloop thermal inertia, solar/battery microgrid coupling, LCM pointer ecology, and interactive Workbench.
+author: cloover
+license: AGPL-3.0
+entrypoint: __init__:register
+
+provides_tools:
+  - mind_get_telemetry
+  - mind_appraise_interaction
+
+provides_hooks:
+  - pre_llm_call
+  - post_tool_call
+  - post_compaction
+  - on_session_start
+  - on_session_finalize
+
+provides_commands:
+  - mind
+
+dashboard:
+  manifest: dashboard/manifest.json
+  api: dashboard/plugin_api.py
+
+config_schema:
+  obsidian_vault_path:
+    type: string
+    default: ""
+    description: "Absolute path to your Obsidian vault for note backlog, open loops, and vault entropy scanning."
+  honcho_inbox_subdir:
+    type: string
+    default: "00_Inbox"
+    description: "Subfolder inside the Obsidian vault where raw/unindexed notes land."
+  honcho_url:
+    type: string
+    default: ""
+    description: "Optional Honcho API URL (e.g. http://127.0.0.1:8000) to poll pending unindexed messages."
+  ha_base_url:
+    type: string
+    default: ""
+    description: "Home Assistant URL (e.g. http://homeassistant.local:8123) for Fronius/solar surplus and battery SoC."
+  ha_token:
+    type: string
+    default: ""
+    secret: true
+    description: "Home Assistant Long-Lived Access Token."
+  ha_solar_entity:
+    type: string
+    default: "sensor.solar_pv_surplus_kw"
+    description: "Entity ID for solar PV surplus power in kW."
+  ha_battery_entity:
+    type: string
+    default: "sensor.home_battery_soc"
+    description: "Entity ID for home battery State of Charge (0-100%)."
+  solar_max_kw:
+    type: number
+    default: 5.0
+    description: "Peak solar surplus kW corresponding to sensors.solar_kw = 1.0."
+  hwmon_coolant_path:
+    type: string
+    default: ""
+    description: "Optional sysfs path for watercooling loop temperature (e.g. /sys/class/hwmon/hwmon4/temp1_input)."
+  use_liquidctl:
+    type: boolean
+    default: true
+    description: "Poll `liquidctl status --json` for watercooling fluid temperature if hwmon path is not set."
+  latitude:
+    type: number
+    default: 48.20
+    description: "Latitude for astronomical sun elevation and Open-Meteo weather/barometer polling."
+  longitude:
+    type: number
+    default: 15.33
+    description: "Longitude for Open-Meteo weather and barometric pressure polling."
+  gateway_url:
+    type: string
+    default: "http://127.0.0.1:8642"
+    description: "Local Hermes Gateway URL used when waking the LLM for proactive outreach or silent vault work."
+  outreach_webhook:
+    type: string
+    default: ""
+    description: "Optional webhook URL (Telegram/Discord/ntfy) to forward unprompted outreach messages."
+  max_context_chars:
+    type: number
+    default: 1000
+    description: "Hard cap on the always-inserted ambient_mind block per turn (chars), protecting prefix cache economics."
+  tick_interval_sec:
+    type: number
+    default: 60.0
+    description: "Background ODE integration interval in seconds (model dt = 1 integration minute per step)."
+

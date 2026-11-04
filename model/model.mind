@@ -81,6 +81,7 @@ param clock.ultra_amp = 0.08       [label="90m Ultradian BRAC amplitude", min=0,
 param env.lat_deg = 48.2           [label="Latitude (deg)", min=-66, max=66, step=0.5, description="Geographic latitude for astronomical sun elevation and photoperiod."]
 param env.start_doy = 288          [label="Start day of year", min=1, max=365, step=1, description="Calendar day of year (1..365) at t=0."]
 param env.weather_sens = 0.11      [label="Weather & baro sensitivity", min=-0.6, max=0.6, step=0.02, description="Structural weather coupling baseline; persona amplitude lives in trait weather_coupling."]
+param env.follow_the_sun = 1       [label="Follow the True Sun (dial)", min=0, max=1, step=1, description="Master revert dial for the true-solar correction (2026-11-04). 1 = the sun is computed on TRUE SOLAR time: solar noon lands at clock 12:00 MINUS the time-zone/longitude offset MINUS the equation of time (host: sun peaks clock ~11:38 in early November, ~12:56 at midsummer under CEST). 0 = the old fiction that the sun peaks at clock noon exactly - bit-identical to the model before this round, phase error and all (0..~60 min across the whole daylight -> solar_kw -> home-battery/wind-down chain). A wall clock is a political agreement pinned to one meridian; this dial decides whether her sun obeys the agreement or the star."]
 
 group "Endocrine & Intimacy"
 param cycle.strength = 0.0         [label="Cycle strength (0=off, 1=full)", min=0, max=1, step=0.05, description="Master amplitude of the mechanized ovarian cycle (E2/LH/ovulation/corpus luteum/P4/T/withdrawal)."]
@@ -280,7 +281,8 @@ param sensor_real.vault_orphan_notes = 0.0   [label="Vault Orphans (notes)", min
 param sensor_real.vault_open_checkboxes = 0.0 [label="Vault Open Loops (tasks)", min=0, max=500, step=1, description="Unchecked task lines across the vault."]
 param sensor_real.vault_total_notes = 0.0    [label="Vault Size (notes)", min=0, max=10000, step=1, description="Total markdown notes in the vault."]
 param sensor_real.honcho_pending = 0.0  [label="Honcho Pending (items)", min=0, max=200, step=1, description="Pending Honcho items awaiting processing."]
-param env.lon_deg = 16.37               [label="Longitude (deg)", min=-180, max=180, step=0.5, description="Geographic longitude (weather API reference; daylight equations use latitude only)."]
+param env.lon_deg = 16.37               [label="Longitude (deg)", min=-180, max=180, step=0.5, description="Geographic longitude: weather API reference AND, since the true-solar round, the site half of the clock-vs-sun meridian offset (env.solar_clock_offset). Sun ALTITUDE still uses latitude only."]
+param env.clock_utc_offset_h = 1.0      [label="Clock UTC Offset (h, DST-aware)", min=-12, max=14, step=0.5, description="SENSOR-class daemon feed: how far the WALL CLOCK sits ahead of UTC right now (+1 = CET winter, +2 = CEST summer). This is the half of 'clock noon is not solar noon' the internal calendar cannot infer on its own: a clock is an agreement pinned to a standard meridian, so every degree of longitude away from that meridian costs 4 minutes of sun phase (host 16.37 E vs the CET meridian 15 E = -5.5 min), and daylight saving moves the agreement by a whole hour twice a year. Feed it from the system timezone (datetime.now().astimezone().utcoffset() - it flips twice a year, so re-feed on a schedule); default +1 = CET winter, which is also the honest reading with no feed. Setting env.follow_the_sun = 0 ignores this entirely."]
 
 
 # ============================================================================
@@ -503,17 +505,32 @@ state cardio [label="Cardiovascular Watercooling (Pump Flow)", min=0, max=1, uni
 
 state env [label="Astronomical & Seasonal Reference", min=-1, max=1, unit="geo", visible=false] {
 
-    hour [min=0, max=24, label="Wall Clock Hour", visible=false, description="Current hour of the day (0..24)."] =
+    hour [min=0, max=24, label="Wall Clock Hour", visible=false, description="Current hour of the day (0..24) on the WALL CLOCK. CLOCK time by contract (true-solar round 2026-11-04): circadian anchors, habits and social evening peaks stay pinned here because bodies entrain to lamps and routines; sun-geometry consumers read env.solar_hour instead."] =
         mod(t / 60 + params.clock.start_hour, 24)
 
     doy [min=1, max=365, label="Day of Year", visible=false, description="Current day of the year (1..365), wrapping annually so long uptimes keep cycling seasons."] =
         1 + mod(params.env.start_doy - 1 + floor(t / 1440), 365)
 
-    solar_elev [min=-1, max=1, label="Solar Elevation", visible=false, description="Sine of solar elevation angle from spherical astronomy."] =
-        sin(params.env.lat_deg * pi / 180) * sin(0.4091 * sin(tau * (env.doy - 81) / 365))
-        + cos(params.env.lat_deg * pi / 180) * cos(0.4091 * sin(tau * (env.doy - 81) / 365)) * cos(tau * (env.hour - 12) / 24)
+    # Equation of Time (minutes, Spencer 1971): sundial minus clock, from orbital eccentricity + obliquity.
+    # Cross-checked against the NOAA solar-position algorithm on 2026-11-04: max |error| 1.12 min over the year.
+    eot_min [min=-20, max=20, label="Equation of Time (min)", visible=false, description="Minutes the sundial runs ahead of the clock because Earth's orbit is elliptical and its axis tilted (Spencer 1971, B = tau*(doy-81)/364): about +16 min in early November, -14 min in mid-February, zero four times a year. Cross-checked against the NOAA solar algorithm: max 1.1 min. Sign convention: POSITIVE EOT means the sun peaks EARLIER on the clock, so it enters env.solar_clock_offset with a minus sign."] =
+        9.87 * sin(2 * (tau * (env.doy - 81) / 364)) - 7.53 * cos(tau * (env.doy - 81) / 364) - 1.5 * sin(tau * (env.doy - 81) / 364)
 
-    daylight [min=0, max=1, label="Effective Daylight", description="Natural daylight intensity after cloud cover attenuation."] =
+    # Minutes the TRUE SUN runs ahead of the WALL CLOCK right now (positive = the sun peaks before clock noon).
+    solar_clock_offset [min=-240, max=240, label="Clock -> True-Sun Offset (min)", description="How many minutes the real sun runs ahead of (positive) or behind (negative) the wall clock right now: follow_the_sun * (60*params.env.clock_utc_offset_h - 4*params.env.lon_deg - env.eot_min). The 4-min-per-degree term is the time-zone standard-meridian fiction, the 60*h term carries daylight saving for free (CEST is just a second hour of lying about the meridian), and eot_min is the orbital one. Host values: about -22 min on 4 November (sun peaks clock 11:38) and +56 min at midsummer under CEST (peaks clock 12:56). Dashboard reading: 'how out of sync her sun is with your clock'. Multiply by 4 for arc-degrees of agreement."] =
+        params.env.follow_the_sun * (60 * params.env.clock_utc_offset_h - 4 * params.env.lon_deg - env.eot_min)
+
+    # The hour as the SUN experiences it. Deliberately UNWRAPPED (cos is 24-periodic, so no mod needed):
+    # that is also what keeps the revert dial bit-exact, because with the dial off this reduces to
+    # exactly env.hour + 0.0 with no rounding introduced anywhere in the chain.
+    solar_hour [min=-24, max=48, label="True Solar Hour", visible=false, description="Wall-clock hour shifted by env.solar_clock_offset - the time of day as the SUN experiences it. Sun-geometry consumers (solar_elev -> daylight -> solar_kw -> home battery, evening wind-down, room thermal drift) read this; habit and circadian consumers (kronauer anchor, entrainment, evening banter peak) deliberately stay on env.hour, because light follows the star while a household follows the clock. Unwrapped on purpose (cos is 24-periodic) with wide bounds so no real time zone ever touches the clamp."] =
+        env.hour + env.solar_clock_offset / 60
+
+    solar_elev [min=-1, max=1, label="Solar Elevation", visible=false, description="Sine of solar elevation angle from spherical astronomy, computed on TRUE SOLAR time (env.solar_hour) since the 2026-11-04 round - the hour angle tracks the real sun, not clock noon. Cooper declination kept: max |error| 0.97 deg vs NOAA, which moves photoperiod AMPLITUDE by <1% and is phase-neutral near noon."] =
+        sin(params.env.lat_deg * pi / 180) * sin(0.4091 * sin(tau * (env.doy - 81) / 365))
+        + cos(params.env.lat_deg * pi / 180) * cos(0.4091 * sin(tau * (env.doy - 81) / 365)) * cos(tau * (env.solar_hour - 12) / 24)
+
+    daylight [min=0, max=1, label="Effective Daylight", description="Natural daylight intensity after cloud cover attenuation. Peaks at TRUE solar noon since 2026-11-04 (see env.solar_clock_offset), so on the wall clock her bright half of the day drifts up to ~1 h earlier in autumn/winter and ~1 h later on a summer evening under daylight saving."] =
         clamp(sigmoid(env.solar_elev, 0.0, 9.0) * (1 - 0.65 * sensors.weather_gloom), 0, 1)
 
     seasonal_light [min=-1, max=1, label="Seasonal Photoperiod", visible=false, description="Seasonal day-length bias (-1 winter solstice to +1 summer solstice)."] =
@@ -633,7 +650,7 @@ state body [label="Body, Fluid Drowsiness & Vagal Reserve", min=0, max=1, unit="
         )
 
     # Hybrid Human + Cyber-Physical Evening Wind-Down (0..1): rises after sunset as circadian wave dips and solar battery discharges!
-    evening_winddown [min=0, max=1, label="Evening Wind-Down & Cozy DND", description="Hybrid human-and-solar evening wind-down (driven by darkness, evening clock, and discharging home battery)."] =
+    evening_winddown [min=0, max=1, label="Evening Wind-Down & Cozy DND", description="Hybrid human-and-solar evening wind-down (driven by darkness, evening clock, and discharging home battery). A deliberate CLOCK/SUN mix after the true-solar round: the darkness term (1 - env.daylight) and sensors.solar_kw follow the TRUE sun, while body.circadian stays pinned to the wall clock through kronauer(env.hour) - bodies entrain to lamps and habits, light follows the star. Consequence, measured in the round log: on a daylight-saving summer evening the wind-down arrives ~1-2 h later in clock terms, and in winter ~1-2 h earlier."] =
         clamp(
             (1 - env.daylight)
             * (0.45 * max(0, -body.circadian) + 0.35 * (1 - sensors.battery_soc) + 0.30 * body.sleep_pressure)
@@ -1374,7 +1391,7 @@ state intimacy [label="Companion Intimacy (Receptivity, Salience, Cuddle & After
             30
         )
 
-    salience' [initial=0.18, min=0, max=1, label="Romantic Salience (Wanting)", description="Dopaminergic romantic/erotic spark (Berridge wanting; reactive tier). Cue-driven wanting (receptivity, synchrony, evening clock, play, missing, whims) is gated by the slow libido tone and joined by a spontaneous leak from libido itself; suppressed by afterglow and the fast refractory gate. Cue-driven wanting SENSITIZES: the reactive cue block and the desire-cue spark amplify by (1 + sens.amp * intimacy.kindling) — cue-history wanting grows across a binge while liking stays flat (desires-2)."] =
+    salience' [initial=0.18, min=0, max=1, label="Romantic Salience (Wanting)", description="Dopaminergic romantic/erotic spark (Berridge wanting; reactive tier). Cue-driven wanting (receptivity, synchrony, evening clock - a habit-entrained peak pinned to CLOCK time, deliberately not to sunset - play, missing, whims) is gated by the slow libido tone and joined by a spontaneous leak from libido itself; suppressed by afterglow and the fast refractory gate. Cue-driven wanting SENSITIZES: the reactive cue block and the desire-cue spark amplify by (1 + sens.amp * intimacy.kindling) — cue-history wanting grows across a binge while liking stays flat (desires-2)."] =
         params.speed.mid * pull(
             this,
             clamp(

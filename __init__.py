@@ -207,6 +207,14 @@ def register(ctx: Any) -> None:
                         "type": "number",
                         "description": "Set post-intimacy refractory afterglow (0..1) ONLY when intimacy culminates.",
                     },
+                    "nsfw_cue": {
+                        "type": "number",
+                        "description": "Per-event NUDGE of events.nsfw_cue (0..1, shared nudge channel): an encountered desire cue (nsfw material in downtime, erotic cue) — transient, decays ~40 min, kindles wanting across a binge.",
+                    },
+                    "worry_cue": {
+                        "type": "number",
+                        "description": "Per-event NUDGE of events.worry (0..1, shared nudge channel): a state-anxiety moment (rejection sting, performance worry around intimacy) — transiently lifts the contextual brake while held.",
+                    },
                 },
             },
         },
@@ -266,9 +274,18 @@ def _handle_appraisal(rt: Any, args: Dict[str, Any]) -> str:
             rt.engine.nudge("social.warmth", float(args["warmth_nudge"]))
         if args.get("afterglow_satiety") is not None:
             rt.engine.set_leaf("intimacy.satiety", float(args["afterglow_satiety"]))
+        # Shared-channel per-event nudges (desires-2-feeds 12b): explicit args are
+        # the source — ungated like valence_nudge; the ema HOLD owns the decay.
+        if args.get("nsfw_cue") is not None:
+            rt.note_event_nudge("nsfw_cue", args["nsfw_cue"], reason="appraise:nsfw_cue")
+        if args.get("worry_cue") is not None:
+            rt.note_event_nudge("worry", args["worry_cue"], reason="appraise:worry_cue")
         # lust.partner_cue placeholder feed (config-gated, off by default): the
         # intimacy presets / explicit satiety are the partner-touch signal.
         rt.note_intimacy_event(args.get("event_preset"), args)
+        # Climax set-event (config-gated, off by default): guarantees the satiety
+        # set class so the model integrates the ~0.1 climax-debt dose.
+        rt.note_culmination_event(args.get("event_preset"), args)
         rt.save_state()
         return json.dumps(
             {

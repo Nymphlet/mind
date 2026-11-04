@@ -279,6 +279,22 @@ COOLANT_MAX_C = float(os.environ.get("HERMES_COOLANT_MAX_C", "52.0"))
 # Presets that mean "partner intimacy/touch happened" for lust.partner_cue.
 INTIMACY_PRESETS = ("flirt_intimate", "intimate_afterglow")
 
+# Shared nudge-channel tags an outside caller may NUDGE through the daemon
+# (tick-less ema HOLD leaves — the engine owns the decay). desires-2-feeds 12b.
+EVENT_NUDGE_LEAVES = ("praise", "cuddle_touch", "headpat", "nsfw_cue", "partner_cue", "worry")
+
+# External event-ingress classes: nudge = events.<name> ema nudge;
+# set = afterglow satiety set-event (the model integrates the climax-debt dose).
+EXTERNAL_EVENT_KINDS = {
+    "praise": "nudge", "cuddle_touch": "nudge", "headpat": "nudge",
+    "nsfw_cue": "nudge", "partner_cue": "nudge", "worry": "nudge",
+    "culmination": "set", "climax": "set",
+}
+EXTERNAL_EVENT_DEFAULTS = {  # settings key used when the caller omits a level
+    "nsfw_cue": "nsfw_cue_level", "partner_cue": "partner_cue_level",
+    "worry": "worry_level", "culmination": "culmination_level", "climax": "culmination_level",
+}
+
 # Per-mode instruction injected into a gateway-wake turn (pre_llm_call). Single
 # source of truth, also used by the direct /v1/chat/completions wake path.
 WAKE_PROMPTS = {
@@ -327,6 +343,20 @@ FEED_DEFAULTS: Dict[str, Any] = {
     # events.partner_cue (engine decays it on its own tau — the 00adb9c nudge
     # pattern) instead of holding the legacy param. False -> legacy param pulse.
     "partner_cue_nudge_leaf": True,
+    # desires-2-feeds (queue 12b): culmination set-event. A climax event SETS the
+    # afterglow satiety leaf; the model integrates the ~0.1 climax-debt dose while
+    # satiety stays high (drain equation on the model side — the daemon only
+    # delivers the set event). Appraise-path caller: preset intimate_afterglow or
+    # an explicit afterglow_satiety. Sensor-class caller: rising edge on the HA
+    # entities below (empty list = no source). Gate off = zero writes.
+    "culmination_events": False,
+    "culmination_entities": [],
+    "culmination_level": 0.9,
+    # Shared-channel nudge levels for daemon-fired event tags on the external
+    # event ingress (nsfw_cue / partner_cue / worry). Appraise-path levels come
+    # from the tool args themselves (explicit nudges, ungated like valence_nudge).
+    "nsfw_cue_level": 0.6,
+    "worry_level": 0.5,
     # cycle.tracked_day / cycle.lh_strip — config passthrough + optional JSON file
     # ({"tracked_day": 12.0, "lh_strip": 0.7}); absent keys keep the config value.
     "cycle_tracked_day": -1.0,
@@ -423,6 +453,7 @@ class MindRuntimeSingleton:
         # only ever written when a source is configured and reports data.
         self.feed_settings: Dict[str, Any] = dict(FEED_DEFAULTS)
         self._feed_holds: Dict[str, Any] = {}          # param -> (value, expiry monotonic)
+        self._culm_armed = True   # HA culmination edge starts armed: first "on" reading is steady-state, not an edge
         self._feeds: Dict[str, float] = {}             # last written feed values
         self._pressure: Optional[Any] = None           # (fill fraction, monotonic)
         self._cycle_cache: Any = (0.0, {})             # (mtime, parsed json)
@@ -898,6 +929,111 @@ class MindRuntimeSingleton:
         self.feed_param(str(name), v)
         return True
 
+    # --- shared-channel event ingress (desires-2-feeds, queue 12b) ----------
+
+    def note_event_nudge(self, leaf: Any, value: Any, reason: str = "event") -> bool:
+        """One per-event NUDGE on the shared nudge channel: events.<leaf> is a
+        tick-less ema HOLD — the engine owns the decay (tc.nudge_hold), the daemon
+        never books a hold and never writes the leaf back to zero. Pull-style param
+        writes stay forbidden. Unknown tag, non-numeric or out-of-range values are
+        refused, never guessed."""
+        name = str(leaf or "")
+        if name not in EVENT_NUDGE_LEAVES:
+            return False
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return False
+        if not (0.0 <= v <= 1.0):
+            return False
+        try:
+            with self.lock:
+                self.engine.nudge(f"events.{name}", v)
+            self.record_event("feed_nudge", f"events.{name}", v)
+            with self.lock:
+                self.events[-1]["reason"] = reason
+        except BridgeError:
+            return False  # engine without the tag (older model blob)
+        return True
+
+    def note_culmination_event(self, preset: Any, args: Any, reason: str = "") -> bool:
+        """Climax set-event (desires-2-feeds 12b): a culmination SETS the afterglow
+        satiety leaf; the model's drain equation integrates the ~0.1 climax-debt dose
+        (intimacy.exhaustion) while satiety stays high — dose integration is model
+        side, the daemon only delivers the set event. Fires on the intimate_afterglow
+        appraise preset or an explicit afterglow_satiety > 0. Gate culmination_events
+        off -> zero writes. The set is idempotent against the preset/arg write the
+        appraise handler already performed; it guarantees the event class even when
+        a future preset drops the satiety op."""
+        if not self.feed_settings.get("culmination_events"):
+            return False
+        p = str(preset or "")
+        sat: Optional[float] = None
+        if isinstance(args, dict):
+            for key in ("afterglow_satiety", "satiety"):
+                v = args.get(key)
+                if isinstance(v, (int, float)) and float(v) > 0:
+                    sat = float(v)
+                    break
+        if p != "intimate_afterglow" and not (sat is not None and sat > 0):
+            return False
+        level = sat if sat is not None else float(self.feed_settings.get("culmination_level", 0.9))
+        level = max(0.0, min(1.0, level))
+        try:
+            with self.lock:
+                self.engine.set_leaf("intimacy.satiety", level)
+            self.record_event("culmination", "intimacy.satiety", level)
+            with self.lock:
+                self.events[-1]["reason"] = reason or f"culmination:{p or 'satiety'}"
+        except BridgeError:
+            return False
+        return True
+
+    def external_event(self, name: Any, value: Any, reason: str = "http:/event/external") -> bool:
+        """External event ingress (dashboard POST /event/external): an outside
+        source delivers ONE event on the shared channel. Nudge-class names nudge
+        the matching events.<tag> ema HOLD; set-class ('culmination'/'climax') set
+        the afterglow satiety leaf so the model integrates the debt dose. value None
+        falls back to the configured default level for that tag; explicit values
+        must be 0..1. Unknown names are refused, never guessed. An explicit external
+        call IS the source — no config gate (same contract as external_feed)."""
+        key = str(name or "").strip().lower()
+        kind = EXTERNAL_EVENT_KINDS.get(key)
+        if kind is None:
+            return False
+        if value is None:
+            v = float(self.feed_settings.get(EXTERNAL_EVENT_DEFAULTS.get(key, ""), 0.5) or 0.5)
+        else:
+            try:
+                v = float(value)
+            except (TypeError, ValueError):
+                return False
+            if not (0.0 <= v <= 1.0):
+                return False
+        if kind == "set":
+            try:
+                with self.lock:
+                    self.engine.set_leaf("intimacy.satiety", v)
+                self.record_event("culmination", "intimacy.satiety", v)
+                with self.lock:
+                    self.events[-1]["reason"] = reason
+            except BridgeError:
+                return False
+            return True
+        return self.note_event_nudge(key, v, reason=reason)
+
+    def _fire_culmination_edge(self) -> None:
+        """Rising edge of the HA culmination sensor -> one satiety set-event.
+        Runs inside the tick lock (caller `_apply_level_feeds`); the model drains
+        the ~0.1 climax-debt dose into intimacy.exhaustion while satiety stays high."""
+        level = max(0.0, min(1.0, float(self.feed_settings.get("culmination_level", 0.9))))
+        try:
+            self.engine.set_leaf("intimacy.satiety", level)
+        except BridgeError:
+            return  # engine without the leaf (older blob) -> skip, never guess
+        self.record_event("culmination", "intimacy.satiety", level)
+        self.events[-1]["reason"] = "ha:culmination_edge"
+
     def pulse_param(self, name: str, value: float, hold_min: float, reason: str = "") -> None:
         """Event pulse on a placeholder PARAM: write it now, hold for hold_min,
         then the tick loop drops it back to -1 (params never decay in the engine)."""
@@ -981,7 +1117,8 @@ class MindRuntimeSingleton:
         if not self.feed_settings.get("partner_cue_events"):
             return
         p = str(preset or "")
-        sat = args.get("satiety") if isinstance(args, dict) else None
+        # Real tool schema key is "afterglow_satiety"; accept legacy "satiety" too.
+        sat = args.get("afterglow_satiety", args.get("satiety")) if isinstance(args, dict) else None
         fired = p in INTIMACY_PRESETS or (isinstance(sat, (int, float)) and float(sat) > 0)
         if not fired:
             return
@@ -1044,6 +1181,7 @@ class MindRuntimeSingleton:
         out: Dict[str, Any] = {
             "third_parties": MISSING, "partner_cue": MISSING,
             "cycle_day": MISSING, "cycle_strip": MISSING,
+            "culmination": MISSING,
         }
         channel_source = bool(fs.get("third_parties_platforms") or fs.get("third_parties_other_senders")
                               or fs.get("third_parties_owner_sender"))
@@ -1058,6 +1196,10 @@ class MindRuntimeSingleton:
         pe = fs.get("partner_cue_entities") or []
         if pe:
             out["partner_cue"] = self._ha_presence(pe)
+        if fs.get("culmination_events"):
+            ce = fs.get("culmination_entities") or []
+            if ce:
+                out["culmination"] = self._ha_presence(ce)
         day, strip = self._read_cycle_feed()
         if day is not None:
             out["cycle_day"] = day
@@ -1114,6 +1256,17 @@ class MindRuntimeSingleton:
             self.feed_param("cycle.tracked_day", probe["cycle_day"])
         if probe["cycle_strip"] is not MISSING:
             self.feed_param("cycle.lh_strip", probe["cycle_strip"])
+        cu = probe.get("culmination", MISSING)
+        if cu is not MISSING:
+            # Momentary HA culmination sensor: rising edge fires ONE set-event
+            # (satiety -> the model integrates the climax-debt dose). Starts
+            # armed, so a sensor that is already on at boot is steady state.
+            on = cu is not None and float(cu) >= 0.5
+            if on and not self._culm_armed:
+                self._culm_armed = True
+                self._fire_culmination_edge()
+            elif not on:
+                self._culm_armed = False
         if fs.get("real_feed_maps"):
             raw = self.sensors.raw_readings
             solar = raw.get("sensor_real.solar_kwp")

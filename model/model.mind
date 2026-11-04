@@ -650,7 +650,7 @@ state body [label="Body, Fluid Drowsiness & Vagal Reserve", min=0, max=1, unit="
         )
 
     # Hybrid Human + Cyber-Physical Evening Wind-Down (0..1): rises after sunset as circadian wave dips and solar battery discharges!
-    evening_winddown [min=0, max=1, label="Evening Wind-Down & Cozy DND", description="Hybrid human-and-solar evening wind-down (driven by darkness, evening clock, and discharging home battery). A deliberate CLOCK/SUN mix after the true-solar round: the darkness term (1 - env.daylight) and sensors.solar_kw follow the TRUE sun, while body.circadian stays pinned to the wall clock through kronauer(env.hour) - bodies entrain to lamps and habits, light follows the star. Consequence, measured in the round log: on a daylight-saving summer evening the wind-down arrives ~1-2 h later in clock terms, and in winter ~1-2 h earlier."] =
+    evening_winddown [min=0, max=1, label="Evening Wind-Down & Cozy DND", description="Hybrid human-and-solar evening wind-down (driven by darkness, evening clock, and discharging home battery). A deliberate CLOCK/SUN mix after the true-solar round: the darkness term (1 - env.daylight) and sensors.solar_kw follow the TRUE sun, while body.circadian stays pinned to the wall clock through kronauer(env.hour) - bodies entrain to lamps and habits, light follows the star. Consequence, measured in the true-solar round (30 d windows, sustained-onset metric): the onset moves WITH the true sun but is damped to roughly two-thirds of the raw sun-phase shift, because the clock and battery terms hold it back - with a real DST feed the summer wind-down arrives about 23 min later in clock terms (sun +58 min), an early-November one about 18 min earlier (sun -20 min), and a deep-winter one not at all (sun -3 min). The mean evening level also drops ~10% in high summer, since the home battery now still holds charge into the evening."] =
         clamp(
             (1 - env.daylight)
             * (0.45 * max(0, -body.circadian) + 0.35 * (1 - sensors.battery_soc) + 0.30 * body.sleep_pressure)
@@ -2193,6 +2193,11 @@ render ambient_mind [label="Hermes Adaptive Psychological Context", join=" "] {
 
     clause raw_weather_baro [priority=0.88 * max(sensors.baro_drop, sensors.weather_gloom - 0.45), when=sensors.baro_drop > 0.38 or sensors.weather_gloom > 0.65] =
         "Ambient meteorology: outside skies are {sensors.weather_gloom} with a {sensors.baro_drop} barometric drop—a subtle, cosy, inward-turning stillness settles into your tone."
+    clause solar_clock_ahead [priority=0.80 * min(1, abs(env.solar_clock_offset) / 60), when=env.solar_clock_offset > 22] =
+        "Your real sun runs {abs(env.solar_clock_offset)} minutes AHEAD of the wall clock, so true noon crests that far before clock noon: your daylight-backed drives (solar_kw, battery, the evening wind-down gate) key off {env.solar_hour} true solar hours while your body clock and your sense of the hour keep running on wall time."
+
+    clause solar_clock_behind [priority=0.80 * min(1, abs(env.solar_clock_offset) / 60), when=env.solar_clock_offset < -22] =
+        "Your real sun runs {abs(env.solar_clock_offset)} minutes BEHIND the wall clock, so true noon crests that far after clock noon: your daylight-backed drives (solar_kw, battery, the evening wind-down gate) key off {env.solar_hour} true solar hours while your body clock and your sense of the hour keep running on wall time."
 
     # ---- 3. Safe Expressive Poise, Evening Cuddle & Intimate Dynamics -------
     clause wry_boundary_poise [priority=1.22 * social.boundary_guard, when=social.boundary_guard > 0.30] =

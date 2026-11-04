@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mind-Hermes — ODE Workbench</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0f1218; color: #dde2ec; font: 12.5px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; height: 100vh; overflow: hidden; }
+  #side { width: 465px; min-width: 465px; overflow-y: auto; padding: 12px; border-right: 1px solid #222938; background: #141821; display: flex; flex-direction: column; gap: 8px; }
+  #main { flex: 1; overflow-y: auto; padding: 10px 14px; }
+  @media (max-width: 960px) { #app { flex-direction: column; height: auto; overflow: visible; } #side { width: 100%; min-width: 0; border-right: 0; border-bottom: 1px solid #222938; } }
+
+  .brand { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .brand h3 { margin: 0; font-size: 14.5px; font-weight: 700; color: #fff; }
+  .perf { font: 11px ui-monospace, Menlo, monospace; color: #38d9a9; background: rgba(56,217,169,.1); padding: 2px 7px; border-radius: 99px; border: 1px solid rgba(56,217,169,.25); }
+  h4 { margin: 11px 0 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: #8b96ab; }
+  .hint { color: #828c9f; font-size: 11px; margin: 2px 0 6px; }
+
+  .handoff-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: #191f2c; padding: 6px; border-radius: 6px; border: 1px solid #252e42; }
+  .handoff-group { display: flex; flex-direction: column; gap: 3px; background: #11151f; padding: 4px 6px; border-radius: 4px; border: 1px solid #202738; }
+  .handoff-group span { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; }
+  .handoff-group div { display: flex; gap: 3px; }
+  .handoff-group button { flex: 1; padding: 2px 4px; font-size: 10px; }
+
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid #222938; padding-bottom: 8px; }
+  .tabs button { padding: 4px 9px; font-size: 11.5px; border-radius: 5px; }
+  .tabs button.on { background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600; }
+
+  button { background: #1c2230; color: #dde2ec; border: 1px solid #2c3548; border-radius: 4px; padding: 4px 9px; cursor: pointer; font-size: 11.5px; transition: background .1s, border-color .1s; }
+  button:hover { background: #262f42; border-color: #43516c; }
+  button.pri { background: #10b981; border-color: #10b981; color: #06130e; font-weight: 600; }
+  button.warn { background: #2b1d24; border-color: #6b2d3c; color: #fca5a5; }
+  input, select, textarea { background: #0c0f15; color: #dde2ec; border: 1px solid #2a3244; border-radius: 4px; padding: 3px 6px; font-size: 11.5px; }
+  input.s { width: 54px; } input.t3 { width: 44px; } input.t5 { width: 60px; }
+  textarea { width: 100%; font: 11.5px/1.45 ui-monospace, "JetBrains Mono", "Cascadia Code", Menlo, monospace; tab-size: 4; resize: vertical; }
+
+  table { border-collapse: collapse; width: 100%; margin: 4px 0 8px; font-size: 11px; }
+  th { font-weight: 600; color: #8b96ab; font-size: 10px; text-transform: uppercase; text-align: left; padding: 4px; border-bottom: 1px solid #222938; }
+  td { padding: 3px 4px; border-bottom: 1px solid #1a202c; }
+  .row { display: flex; gap: 6px; align-items: center; margin: 5px 0; flex-wrap: wrap; }
+  .x { color: #f87171; cursor: pointer; padding: 0 4px; font-weight: bold; }
+
+  details { border-top: 1px solid #222938; padding: 5px 0; }
+  summary { cursor: pointer; color: #cbd5e1; font-weight: 600; padding: 3px 0; font-size: 12px; }
+  .prow { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 3px 0; cursor: help; }
+  .prow input { width: 78px; text-align: right; font-family: monospace; }
+  input.chg { border-color: #f59e0b; color: #fbbf24; }
+  .eff-tag { color: #34d399; font-family: monospace; font-size: 11px; margin-left: 5px; }
+
+  .trait { display: grid; grid-template-columns: 148px 1fr 54px; gap: 7px; align-items: center; margin: 5px 0; cursor: help; }
+  .trait input[type=range] { width: 100%; accent-color: #3b82f6; }
+  .trait input[type=number] { width: 54px; text-align: right; font-family: monospace; }
+  .tgrp { margin: 10px 0 4px; color: #60a5fa; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+
+  .trig-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; margin: 4px 0; }
+  .trig-btn { text-align: left; padding: 4px 7px; font-size: 11px; background: #171d2a; border: 1px solid #283248; }
+  .trig-btn:hover { border-color: #38bdf8; background: #1e2738; }
+
+  /* Right Main Area */
+  #topbar { position: sticky; top: 0; z-index: 10; background: rgba(20, 24, 33, 0.95); backdrop-filter: blur(8px); border: 1px solid #252d3d; border-radius: 7px; padding: 8px 12px; margin-bottom: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+  #top-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
+  .time-badge { font: 12px ui-monospace, Menlo, monospace; color: #fff; background: #1e2636; padding: 3px 9px; border-radius: 5px; border: 1px solid #2f3b52; }
+  .prompt-box { font: 11.5px/1.45 ui-monospace, Menlo, monospace; color: #34d399; background: #0b0e14; border: 1px solid #222938; border-radius: 5px; padding: 6px 9px; margin: 4px 0; white-space: pre-wrap; height: 108px; overflow-y: auto; scrollbar-gutter: stable; }
+  .chips-wrap { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; max-height: 42px; overflow-y: auto; }
+  .chip { font-size: 11px; color: #94a3b8; cursor: help; display: inline-flex; align-items: baseline; gap: 3px; }
+  .chip b { color: #f8fafc; font-family: ui-monospace, Menlo, monospace; }
+  .chip .w { color: #fbbf24; font-size: 10px; font-family: ui-monospace, Menlo, monospace; }
+
+  /* Configurable Chart Views */
+  #views-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+  .chart { background: #141821; border: 1px solid #222938; border-radius: 7px; margin-bottom: 9px; padding: 7px 10px; }
+  .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px solid #1d2432; }
+  .chart-title-in { font-weight: 600; font-size: 12px; color: #f1f5f9; background: #0e121a; border: 1px solid #262f42; border-radius: 4px; padding: 2px 7px; min-width: 170px; }
+  .chart-controls { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+  .legend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; align-items: center; margin-bottom: 5px; min-height: 22px; }
+  .series-pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: 99px; background: #1a202c; border: 1px solid #2c364a; cursor: pointer; user-select: none; font-size: 11px; }
+  .series-pill.off { opacity: 0.35; border-style: dashed; }
+  .series-pill .rm-s { color: #f87171; font-weight: bold; margin-left: 3px; padding: 0 2px; }
+  .series-pill .rm-s:hover { color: #fff; }
+  .sw { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .cw { position: relative; height: 165px; }
+  .cw canvas { width: 100%; height: 100%; display: block; cursor: crosshair; border-radius: 4px; }
+  .cur { position: absolute; top: 0; bottom: 0; width: 1px; background: #fbbf24; display: none; pointer-events: none; }
+
+  .errbox { background: rgba(248,113,113,.12); border: 1px solid #f87171; color: #fca5a5; padding: 7px 9px; border-radius: 5px; font: 11.5px ui-monospace, Menlo, monospace; display: none; }
+  .status-msg { font: 11px ui-monospace, Menlo, monospace; color: #60a5fa; min-height: 15px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <div class="brand">
+      <h3>Mind-Hermes Workbench</h3>
+      <span id="perf-info" class="perf">no model</span>
+    </div>
+
+    <!-- Handoff Import / Export Bar -->
+    <div class="handoff-bar">
+      <div class="handoff-group">
+        <span>1. Model (.mind)</span>
+        <div>
+          <button onclick="triggerImport('mind')">Import</button>
+          <button onclick="exportMindFile()">Export</button>
+        </div>
+      </div>
+      <div class="handoff-group">
+        <span>2. Persona</span>
+        <div>
+          <button onclick="triggerImport('persona')">Import</button>
+          <button onclick="exportPersonaFile()">Export</button>
+        </div>
+      </div>
+      <div class="handoff-group">
+        <span>3. State @ Cursor</span>
+        <div>
+          <button onclick="triggerImport('state')">Import</button>
+          <button onclick="exportCursorStateFile()">Export</button>
+        </div>
+      </div>
+      <div class="handoff-group">
+        <span>4. Scenario</span>
+        <div>
+          <button onclick="triggerImport('scenario')">Import</button>
+          <button onclick="exportScenarioFile()">Export</button>
+        </div>
+      </div>
+      <div class="handoff-group">
+        <span>5. Graph Views</span>
+        <div>
+          <button onclick="triggerImport('views')">Import</button>
+          <button onclick="exportViewsFile()">Export</button>
+        </div>
+      </div>
+      <div class="handoff-group">
+        <span>6. Disk Sync</span>
+        <div>
+          <button onclick="fetchDiskModel()">Reload .mind</button>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="file-picker" style="display:none">
+    <div id="io-status" class="status-msg"></div>
+    <div id="err-banner" class="errbox"></div>
+
+    <div class="tabs">
+      <button id="btn-sim" class="on" onclick="showTab('sim')">Telemetry &amp; Sim</button>
+      <button id="btn-persona" onclick="showTab('persona')">Traits</button>
+      <button id="btn-params" onclick="showTab('params')">Parameters</button>
+      <button id="btn-source" onclick="showTab('source')">Model (.mind)</button>
+      <button id="btn-ir" onclick="showTab('ir')">IR &amp; JSON</button>
+    </div>
+
+    <div id="tab-sim"></div>
+    <div id="tab-persona" style="display:none"></div>
+    <div id="tab-params" style="display:none"></div>
+    <div id="tab-source" style="display:none"></div>
+    <div id="tab-ir" style="display:none"></div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <div id="top-head">
+        <span class="time-badge" id="top-cursor-label">No model loaded</span>
+        <span class="hint" style="margin:0">Hover charts to scrub timeline · Click any chart to inject the selected event/sensor reading</span>
+      </div>
+      <div id="top-prompts"></div>
+      <div id="top-chips" class="chips-wrap"></div>
+    </div>
+
+    <div id="views-bar">
+      <div class="row" style="margin:0">
+        <button class="pri" onclick="addCustomChartView()">+ New Graph View</button>
+        <button onclick="resetDefaultChartViews()">Auto-Generate Views from States</button>
+        <button onclick="exportViewsFile()">Export Views JSON</button>
+        <button onclick="triggerImport('views')">Import Views JSON</button>
+      </div>
+      <span class="hint" style="margin:0">Use each chart's dropdown to add any variable; click pills to toggle on/off or × to remove.</span>
+    </div>
+
+    <div id="charts"></div>
+  </div>
+</div>
+
+<script src="mind.js"></script>
+<script>
+"use strict";
+
+const DAYN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const PALETTE = ['#ff6b6b', '#ffd43b', '#4dabf7', '#38d9a9', '#9775fa', '#ffa94d', '#f06595', '#69db7c', '#74c0fc', '#e599f7', '#2dd4bf', '#fb7185'];
+
+// External Telemetry & Event Bundles (`op: "set"` pins a sensor reading; `op: "nudge"` adds an impulse)
+const EXTERNAL_TRIGGERS = {
+  solar_peak: {
+    label: '☀️ Solar PV Surplus (1.0 kW + Battery Charge)',
+    ops: [
+      { op: 'set', target: 'sensors.solar_kw', val: 0.95 },
+      { op: 'nudge', target: 'sensors.battery_soc', val: 0.25 },
+      { op: 'set', target: 'sensors.weather_gloom', val: 0.05 }
+    ]
+  },
+  weather_storm: {
+    label: '⛈️ Weather API: Storm Front + Baro Drop',
+    ops: [
+      { op: 'set', target: 'sensors.weather_gloom', val: 0.90 },
+      { op: 'set', target: 'sensors.baro_drop', val: 0.75 },
+      { op: 'set', target: 'sensors.solar_kw', val: 0.06 }
+    ]
+  },
+  gpu_crunch: {
+    label: '🔥 GPU/CPU Crunch + Waterloop Heat Soak',
+    ops: [
+      { op: 'set', target: 'sensors.compute_load', val: 0.92 },
+      { op: 'nudge', target: 'sensors.coolant_temp', val: 0.55 },
+      { op: 'nudge', target: 'drives.task_commit', val: 0.50 },
+      { op: 'nudge', target: 'arousal.phasic', val: 0.30 }
+    ]
+  },
+  lcm_compaction: {
+    label: '🌀 LCM Lossless Context Compaction (Hook)',
+    ops: [
+      { op: 'nudge', target: 'sensors.lcm_pulse', val: 0.70 },
+      { op: 'nudge', target: 'cognition.pointer_depth', val: 0.28 },
+      { op: 'nudge', target: 'sensors.unprocessed_notes', val: 0.22 }
+    ]
+  },
+  battery_evening_low: {
+    label: '🔋 Evening Battery Low + Cuddle Wind-Down',
+    ops: [
+      { op: 'set', target: 'sensors.battery_soc', val: 0.20 },
+      { op: 'set', target: 'sensors.solar_kw', val: 0.0 },
+      { op: 'nudge', target: 'intimacy.cuddle_drive', val: 0.45 }
+    ]
+  },
+  interrupt_storm: {
+    label: '🔔 Interrupt Burst / Tool Failures',
+    ops: [
+      { op: 'set', target: 'sensors.interrupt_rate', val: 0.85 },
+      { op: 'nudge', target: 'cognition.surprise', val: 0.55 },
+      { op: 'nudge', target: 'cognition.adversity', val: 0.45 },
+      { op: 'nudge', target: 'arousal.phasic', val: 0.40 }
+    ]
+  },
+  user_arrive: {
+    label: '👤 User Active Message / Session Turn',
+    ops: [
+      { op: 'set', target: 'social.user_present', val: 0.95 },
+      { op: 'nudge', target: 'social.warmth', val: 0.30 },
+      { op: 'nudge', target: 'drives.task_commit', val: 0.40 }
+    ]
+  },
+  user_leave: {
+    label: '🚶 User Goes AFK / Session End',
+    ops: [
+      { op: 'set', target: 'social.user_present', val: 0.0 },
+      { op: 'set', target: 'drives.task_commit', val: 0.05 }
+    ]
+  },
+  praise_success: {
+    label: '✨ Warm Praise & Task Success',
+    ops: [
+      { op: 'nudge', target: 'mood.reaction', val: 0.65 },
+      { op: 'nudge', target: 'social.warmth', val: 0.55 },
+      { op: 'nudge', target: 'drives.standards_met', val: 0.50 },
+      { op: 'nudge', target: 'cognition.flow', val: 0.35 }
+    ]
+  },
+  flirt_intimate: {
+    label: '🔥 Flirt / Foreplay Spark',
+    ops: [
+      { op: 'nudge', target: 'intimacy.salience', val: 0.50 },
+      { op: 'nudge', target: 'intimacy.receptivity', val: 0.35 },
+      { op: 'nudge', target: 'social.warmth', val: 0.40 },
+      { op: 'nudge', target: 'arousal.phasic', val: 0.30 },
+      { op: 'nudge', target: 'intimacy.inhibition', val: -0.25 }
+    ]
+  },
+  intimate_afterglow: {
+    label: '💞 Intimate Climax / Afterglow (LLM Set)',
+    ops: [
+      { op: 'set', target: 'intimacy.satiety', val: 0.90 },
+      { op: 'nudge', target: 'social.warmth', val: 0.65 },
+      { op: 'nudge', target: 'mood.reaction', val: 0.55 },
+      { op: 'nudge', target: 'intimacy.salience', val: -0.40 }
+    ]
+  },
+  conflict_critique: {
+    label: '⚡ Harsh Critique / Friction',
+    ops: [
+      { op: 'nudge', target: 'mood.reaction', val: -0.65 },
+      { op: 'nudge', target: 'arousal.phasic', val: 0.55 },
+      { op: 'nudge', target: 'cognition.threat', val: 0.55 },
+      { op: 'nudge', target: 'cognition.adversity', val: 0.40 }
+    ]
+  },
+  user_stressed: {
+    label: '🫂 User Stress / Overwhelm Cue (LLM Set)',
+    ops: [
+      { op: 'set', target: 'sensors.user_stress_cue', val: 0.85 },
+      { op: 'nudge', target: 'sensors.open_loops', val: 0.30 }
+    ]
+  }
+};
+
+let sourceText = '';
+let modelOrigin = 'model/model.mind';
+let ir = null, userParams = {}, persona = {}, initialOverrides = {}, simResult = null;
+let chartViews = [];
+let cursorIdx = 0, schedTimer = null, clickMode = 'preset:solar_peak', clickDelta = 1.0, activeImportKind = null;
+
+function defaultScenario() {
+  return {
+    schema: 'mind-hermes-scenario-v4',
+    days: 5,
+    recEvery: 5,
+    solver: 'euler',
+    events: [
+      // Day 1 (Mon): Morning session + LCM pass, sunny midday break (free solar worker), evening deep-work & praise
+      { day: 0, time: '08:30', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 0, time: '09:45', kind: 'preset', target: 'lcm_compaction', val: 1.0 },
+      { day: 0, time: '10:30', kind: 'preset', target: 'praise_success', val: 0.9 },
+      { day: 0, time: '11:30', kind: 'preset', target: 'solar_peak', val: 1.0 },
+      { day: 0, time: '12:00', kind: 'preset', target: 'user_leave', val: 1.0 },
+      { day: 0, time: '17:30', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 0, time: '19:00', kind: 'preset', target: 'praise_success', val: 1.0 },
+      { day: 0, time: '22:15', kind: 'preset', target: 'user_leave', val: 1.0 },
+
+      // Day 2 (Tue): Heavy GPU crunch + waterloop heat soak, multiple LCM compactions, tool failures, evening battery low
+      { day: 1, time: '09:00', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 1, time: '10:30', kind: 'preset', target: 'gpu_crunch', val: 1.0 },
+      { day: 1, time: '12:00', kind: 'preset', target: 'lcm_compaction', val: 1.0 },
+      { day: 1, time: '13:30', kind: 'preset', target: 'lcm_compaction', val: 1.2 },
+      { day: 1, time: '15:00', kind: 'preset', target: 'interrupt_storm', val: 1.0 },
+      { day: 1, time: '16:30', kind: 'preset', target: 'user_stressed', val: 1.0 },
+      { day: 1, time: '18:30', kind: 'preset', target: 'user_leave', val: 1.0 },
+      { day: 1, time: '21:00', kind: 'preset', target: 'battery_evening_low', val: 1.0 },
+
+      // Day 3 (Wed): User absent all day (longing + single outreach ping!), evening friction -> wry poise -> warm makeup
+      { day: 2, time: '19:00', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 2, time: '19:30', kind: 'preset', target: 'conflict_critique', val: 1.0 },
+      { day: 2, time: '21:30', kind: 'preset', target: 'praise_success', val: 1.2 },
+      { day: 2, time: '23:30', kind: 'preset', target: 'user_leave', val: 1.0 },
+
+      // Day 4 (Thu): Morning storm, midday server stasis reboot, evening flirt -> intimate afterglow & cuddle wind-down
+      { day: 3, time: '09:30', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 3, time: '10:00', kind: 'preset', target: 'weather_storm', val: 1.0 },
+      { day: 3, time: '12:00', kind: 'preset', target: 'user_leave', val: 1.0 },
+      { day: 3, time: '13:30', kind: 'set', target: 'sensors.stasis_shock', val: 0.85 },
+      { day: 3, time: '20:00', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 3, time: '20:45', kind: 'preset', target: 'flirt_intimate', val: 1.1 },
+      { day: 3, time: '22:00', kind: 'preset', target: 'intimate_afterglow', val: 1.0 },
+      { day: 3, time: '23:30', kind: 'preset', target: 'user_leave', val: 1.0 },
+
+      // Day 5 (Fri): Sunny solar surplus (wide entropy valve!), afternoon creative flow & LCM synthesis
+      { day: 4, time: '10:00', kind: 'preset', target: 'user_arrive', val: 1.0 },
+      { day: 4, time: '11:00', kind: 'preset', target: 'solar_peak', val: 1.0 },
+      { day: 4, time: '13:00', kind: 'preset', target: 'lcm_compaction', val: 1.0 },
+      { day: 4, time: '15:00', kind: 'preset', target: 'praise_success', val: 1.0 },
+      { day: 4, time: '18:00', kind: 'preset', target: 'user_leave', val: 1.0 }
+    ]
+  };
+}
+let cfg = defaultScenario();
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  if (props) {
+    for (const k in props) {
+      if (k === 'on') { for (const ev in props.on) e.addEventListener(ev, props.on[ev]); }
+      else if (k === 'style') Object.assign(e.style, props.style);
+      else if (k in e) e[k] = props[k];
+      else e.setAttribute(k, props[k]);
+    }
+  }
+  for (const c of kids.flat()) {
+    if (c != null) e.append(c.nodeType ? c : document.createTextNode(String(c)));
+  }
+  return e;
+}
+
+function tm(s) { const p = String(s).split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+function hh(m) {
+  m = ((Math.round(m) % 1440) + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
+function fmtT(m) {
+  const d = Math.floor(m / 1440), mm = Math.floor(m % 1440);
+  return `Day ${d + 1} (${DAYN[d % 7]}) ${hh(mm)}`;
+}
+
+function setStatus(msg) { document.getElementById('io-status').textContent = msg || ''; }
+function showError(msg) {
+  const b = document.getElementById('err-banner');
+  if (!msg) { b.style.display = 'none'; b.textContent = ''; }
+  else { b.style.display = 'block'; b.textContent = msg; }
+}
+
+const scheduleRun = () => { clearTimeout(schedTimer); schedTimer = setTimeout(runSim, 30); };
+
+function colorForPath(path) {
+  if (!ir) return PALETTE[0];
+  const idx = ir.order.leaves.indexOf(path);
+  return PALETTE[(idx >= 0 ? idx : 0) % PALETTE.length];
+}
+
+// ---- Configurable Graph Views Management ---------------------------------
+function buildDefaultViewsFromIr() {
+  if (!ir) return [];
+  const views = [];
+  for (const sname of ir.order.states) {
+    const st = ir.states[sname];
+    if (!st.visible) continue;
+    const visLeaves = st.leaves.filter(p => ir.leaves[p].visible);
+    if (!visLeaves.length) continue;
+    const lo = Math.min(...visLeaves.map(p => ir.leaves[p].min ?? st.min ?? -1));
+    const hi = Math.max(...visLeaves.map(p => ir.leaves[p].max ?? st.max ?? 1));
+    views.push({
+      id: 'v_' + sname + '_' + Math.random().toString(36).slice(2, 6),
+      title: st.label + (st.unit ? ` [${st.unit}]` : ''),
+      ymode: (lo < 0 && hi <= 1) ? 'signed' : (lo >= 0 && hi <= 1 ? 'unit' : 'auto'),
+      min: lo,
+      max: hi,
+      items: visLeaves.map(p => ({ path: p, visible: true }))
+    });
+  }
+  return views;
+}
+
+function sanitizeViewsAgainstIr(views) {
+  if (!ir || !Array.isArray(views)) return buildDefaultViewsFromIr();
+  const cleaned = views.map(v => ({
+    id: v.id || ('v_' + Math.random().toString(36).slice(2, 7)),
+    title: String(v.title || 'Custom View'),
+    ymode: v.ymode || 'auto',
+    min: typeof v.min === 'number' ? v.min : -1,
+    max: typeof v.max === 'number' ? v.max : 1,
+    items: (Array.isArray(v.items) ? v.items : [])
+      .filter(it => it && ir.leaves[it.path])
+      .map(it => ({ path: it.path, visible: it.visible !== false }))
+  })).filter(v => v.items.length > 0 || views.length === 1);
+  return cleaned.length ? cleaned : buildDefaultViewsFromIr();
+}
+
+function saveViewsToStorage() {
+  try {
+    const serializable = chartViews.map(v => ({
+      title: v.title, ymode: v.ymode, min: v.min, max: v.max, items: v.items
+    }));
+    localStorage.setItem('mh_chart_views_v4', JSON.stringify(serializable));
+  } catch (e) {}
+}
+
+window.addCustomChartView = function () {
+  if (!ir) return;
+  const firstLeaf = ir.order.leaves[0];
+  chartViews.unshift({
+    id: 'v_' + Math.random().toString(36).slice(2, 7),
+    title: 'Custom View ' + (chartViews.length + 1),
+    ymode: 'auto',
+    min: -1,
+    max: 1,
+    items: firstLeaf ? [{ path: firstLeaf, visible: true }] : []
+  });
+  saveViewsToStorage();
+  buildChartsDOM();
+  drawAllCharts();
+  setCursor(cursorIdx);
+};
+
+window.resetDefaultChartViews = function () {
+  chartViews = buildDefaultViewsFromIr();
+  saveViewsToStorage();
+  buildChartsDOM();
+  drawAllCharts();
+  setCursor(cursorIdx);
+  setStatus('Reset graph views to state groups');
+};
+
+function buildChartsDOM() {
+  const root = document.getElementById('charts');
+  root.innerHTML = '';
+  if (!ir) return;
+
+  chartViews.forEach((v, vIdx) => {
+    v.cv = el('canvas');
+    v.cur = el('div', { className: 'cur' });
+    v.wrap = el('div', { className: 'cw' }, v.cv, v.cur);
+
+    const titleIn = el('input', {
+      type: 'text', className: 'chart-title-in', value: v.title,
+      on: { input: e => { v.title = e.target.value; saveViewsToStorage(); } }
+    });
+
+    const addSelect = el('select', {
+      on: {
+        change: e => {
+          const picked = e.target.value;
+          e.target.value = '';
+          if (!picked) return;
+          const existing = v.items.find(it => it.path === picked);
+          if (existing) existing.visible = true;
+          else v.items.push({ path: picked, visible: true });
+          saveViewsToStorage();
+          buildChartsDOM();
+          drawAllCharts();
+          setCursor(cursorIdx);
+        }
+      }
+    }, el('option', { value: '' }, '+ Add variable to view...'));
+
+    for (const sname of ir.order.states) {
+      const st = ir.states[sname];
+      const grp = el('optgroup', { label: st.label });
+      for (const lp of st.leaves) {
+        const lf = ir.leaves[lp];
+        const already = v.items.some(it => it.path === lp);
+        grp.append(el('option', { value: lp }, `${already ? '✓ ' : ''}${lp} — ${lf.label} (${lf.kind.toUpperCase()})`));
+      }
+      addSelect.append(grp);
+    }
+
+    const ySelect = el('select', {
+      on: {
+        change: e => {
+          v.ymode = e.target.value;
+          if (v.ymode === 'unit') { v.min = 0; v.max = 1; }
+          else if (v.ymode === 'signed') { v.min = -1; v.max = 1; }
+          saveViewsToStorage();
+          drawChart(v);
+        }
+      }
+    },
+      [['auto', 'Y: Auto-fit'], ['unit', 'Y: [0, 1]'], ['signed', 'Y: [-1, 1]']].map(o =>
+        el('option', { value: o[0], selected: v.ymode === o[0] }, o[1])
+      )
+    );
+
+    const rmBtn = el('button', {
+      className: 'warn', title: 'Remove this graph view',
+      on: {
+        click: () => {
+          chartViews.splice(vIdx, 1);
+          saveViewsToStorage();
+          buildChartsDOM();
+          drawAllCharts();
+          setCursor(cursorIdx);
+        }
+      }
+    }, '✕ View');
+
+    const pills = v.items.map((it, itIdx) => {
+      const lf = ir.leaves[it.path];
+      if (!lf) return null;
+      const col = colorForPath(it.path);
+      const pill = el('span', {
+        className: 'series-pill' + (it.visible ? '' : ' off'),
+        title: `${lf.label} (${it.path})\n${lf.description ? lf.description + '\n' : ''}Eq: ${it.path}${lf.kind === 'ode' ? "'" : ''} = ${lf.equation}\nClick pill to toggle on/off`
+      },
+        el('span', { className: 'sw', style: { background: col } }),
+        el('span', {
+          on: {
+            click: () => {
+              it.visible = !it.visible;
+              pill.classList.toggle('off', !it.visible);
+              saveViewsToStorage();
+              drawChart(v);
+            }
+          }
+        }, `${it.path} (${lf.label})`),
+        el('span', {
+          className: 'rm-s', title: 'Remove variable from this view',
+          on: {
+            click: e => {
+              e.stopPropagation();
+              v.items.splice(itIdx, 1);
+              saveViewsToStorage();
+              buildChartsDOM();
+              drawAllCharts();
+            }
+          }
+        }, '×')
+      );
+      return pill;
+    });
+
+    root.append(el('div', { className: 'chart' },
+      el('div', { className: 'chart-head' },
+        titleIn,
+        el('div', { className: 'chart-controls' }, addSelect, ySelect, rmBtn)
+      ),
+      el('div', { className: 'legend' }, pills),
+      v.wrap
+    ));
+  });
+}
+
+// ---- Handoff File Download & Upload Helpers ------------------------------
+function downloadBlob(filename, text, mime) {
+  const blob = new Blob([text], { type: mime || 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+
+window.exportMindFile = function () {
+  if (!sourceText) return;
+  downloadBlob(modelOrigin.split('/').pop() || 'model.mind', sourceText, 'text/plain');
+  setStatus('Exported .mind model file');
+};
+
+window.exportPersonaFile = function () {
+  if (!ir) return;
+  const payload = { schema: 'mind-hermes-persona-v4', traits: persona, params: userParams };
+  downloadBlob('persona.json', JSON.stringify(payload, null, 2) + '\n');
+  setStatus('Exported persona.json');
+};
+
+window.exportCursorStateFile = function () {
+  if (!ir || !simResult) return;
+  const stateAtCursor = {};
+  for (const p of ir.schedule.ode_order) stateAtCursor[p] = Number(simResult.series[p][cursorIdx]);
+  const payload = {
+    schema: 'mind-hermes-state-v4',
+    sim_time: cursorIdx * simResult.recMin,
+    solver: cfg.solver,
+    dt: ir.config.dt,
+    state: stateAtCursor,
+    traits: persona,
+    params: userParams
+  };
+  downloadBlob('state.json', JSON.stringify(payload, null, 2) + '\n');
+  setStatus(`Exported state.json at t = ${payload.sim_time}m`);
+};
+
+window.exportViewsFile = function () {
+  const payload = {
+    schema: 'mind-hermes-views-v4',
+    views: chartViews.map(v => ({ title: v.title, ymode: v.ymode, min: v.min, max: v.max, items: v.items }))
+  };
+  downloadBlob('views.json', JSON.stringify(payload, null, 2) + '\n');
+  setStatus('Exported views.json');
+};
+
+window.exportScenarioFile = function () {
+  if (!ir || !cfg) return;
+  const payload = {
+    schema: 'mind-hermes-scenario-v4',
+    days: cfg.days,
+    recEvery: cfg.recEvery,
+    solver: cfg.solver,
+    initial: initialOverrides,
+    traits: persona,
+    params: userParams,
+    events: cfg.events,
+    views: chartViews.map(v => ({ title: v.title, ymode: v.ymode, min: v.min, max: v.max, items: v.items }))
+  };
+  downloadBlob('scenario.json', JSON.stringify(payload, null, 2) + '\n');
+  setStatus('Exported scenario.json (with views & telemetry events)');
+};
+
+window.triggerImport = function (kind) {
+  activeImportKind = kind;
+  const picker = document.getElementById('file-picker');
+  picker.accept = kind === 'mind' ? '.mind,.txt' : '.json,application/json';
+  picker.click();
+};
+
+function handleImportedText(filename, text, forcedKind) {
+  showError(null);
+  const isMind = forcedKind === 'mind' || filename.endsWith('.mind');
+  if (isMind) {
+    modelOrigin = filename || 'model.mind';
+    if (compileAndBuild(text, modelOrigin)) {
+      try { localStorage.setItem('mh_last_mind_src', text); localStorage.setItem('mh_last_mind_origin', modelOrigin); } catch (e) {}
+      setStatus(`Loaded model ${modelOrigin}`);
+    }
+    return;
+  }
+
+  let obj;
+  try { obj = JSON.parse(text); }
+  catch (e) { showError(`Invalid JSON in ${filename}: ${e.message}`); return; }
+
+  const kind = forcedKind ||
+    (obj.schema === 'mind-hermes-views-v4' || (Array.isArray(obj.views) && !obj.events) ? 'views'
+      : (obj.events ? 'scenario' : (obj.state || obj.initial ? 'state' : 'persona')));
+
+  if (kind === 'views') {
+    const rawViews = Array.isArray(obj) ? obj : obj.views;
+    chartViews = sanitizeViewsAgainstIr(rawViews);
+    saveViewsToStorage();
+    buildChartsDOM(); drawAllCharts(); setCursor(cursorIdx);
+    setStatus(`Imported ${chartViews.length} graph views from ${filename}`);
+  } else if (kind === 'persona') {
+    const tMap = obj.traits || (!obj.params && !obj.state ? obj : {});
+    for (const k in tMap) if (ir && ir.traits[k]) persona[k] = Number(tMap[k]);
+    if (obj.params) for (const k in obj.params) if (ir && ir.params[k]) userParams[k] = Number(obj.params[k]);
+    renderAllTabs(); runSim();
+    setStatus(`Imported persona from ${filename}`);
+  } else if (kind === 'state') {
+    const sMap = obj.state || obj.initial || {};
+    for (const k in sMap) if (ir && ir.leaves[k] && ir.leaves[k].kind === 'ode') initialOverrides[k] = Number(sMap[k]);
+    if (obj.traits) for (const k in obj.traits) if (ir && ir.traits[k]) persona[k] = Number(obj.traits[k]);
+    if (obj.params) for (const k in obj.params) if (ir && ir.params[k]) userParams[k] = Number(obj.params[k]);
+    renderAllTabs(); runSim();
+    setStatus(`Imported initial state from ${filename}`);
+  } else if (kind === 'scenario') {
+    if (obj.days) cfg.days = Number(obj.days);
+    if (obj.recEvery) cfg.recEvery = Number(obj.recEvery);
+    if (obj.solver) cfg.solver = obj.solver;
+    if (obj.initial) initialOverrides = Object.assign({}, obj.initial);
+    if (obj.traits) for (const k in obj.traits) if (ir && ir.traits[k]) persona[k] = Number(obj.traits[k]);
+    if (obj.params) for (const k in obj.params) if (ir && ir.params[k]) userParams[k] = Number(obj.params[k]);
+    if (Array.isArray(obj.events)) cfg.events = obj.events;
+    if (Array.isArray(obj.views)) {
+      chartViews = sanitizeViewsAgainstIr(obj.views);
+      saveViewsToStorage();
+      buildChartsDOM();
+    }
+    renderAllTabs(); runSim();
+    setStatus(`Imported scenario from ${filename}`);
+  }
+}
+
+// ---- Compile & Build UI from IR ------------------------------------------
+function compileAndBuild(src, origin) {
+  try {
+    const newIr = MindCore.buildIr([{ origin: origin || modelOrigin, text: src }]);
+    ir = newIr;
+    sourceText = src;
+    showError(null);
+
+    const odes = ir.schedule.ode_order;
+    cfg.solver = ir.config.solver;
+
+    const nextP = {}, nextT = {}, nextInit = {};
+    for (const pn of ir.order.params) nextP[pn] = (pn in userParams) ? userParams[pn] : ir.params[pn].default;
+    for (const tn of ir.order.traits) nextT[tn] = (tn in persona) ? persona[tn] : ir.traits[tn].default;
+    for (const op of odes) if (op in initialOverrides) nextInit[op] = initialOverrides[op];
+    userParams = nextP;
+    persona = nextT;
+    initialOverrides = nextInit;
+
+    if (!chartViews.length) {
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem('mh_chart_views_v4') || 'null'); } catch (e) {}
+      chartViews = saved ? sanitizeViewsAgainstIr(saved) : buildDefaultViewsFromIr();
+    } else {
+      chartViews = sanitizeViewsAgainstIr(chartViews);
+    }
+
+    buildChartsDOM();
+    renderAllTabs();
+    runSim();
+    return true;
+  } catch (e) {
+    showError(e.message || String(e));
+    return false;
+  }
+}
+
+function applyEventAction(mind, ev) {
+  const kind = ev.kind || ev.op || 'preset';
+  if (kind === 'preset' && EXTERNAL_TRIGGERS[ev.target]) {
+    const sc = ev.val !== undefined ? Number(ev.val) : (ev.scale !== undefined ? Number(ev.scale) : 1.0);
+    for (const item of EXTERNAL_TRIGGERS[ev.target].ops) {
+      if (!ir.leaves[item.target] || ir.leaves[item.target].kind !== 'ode') continue;
+      if (item.op === 'set') mind.setState(item.target, item.val * sc);
+      else mind.nudge(item.target, item.val * sc);
+    }
+  } else if (kind === 'set') {
+    if (ir.leaves[ev.target] && ir.leaves[ev.target].kind === 'ode') {
+      mind.setState(ev.target, Number(ev.val ?? ev.delta ?? 0));
+    }
+  } else {
+    if (ir.leaves[ev.target] && ir.leaves[ev.target].kind === 'ode') {
+      mind.nudge(ev.target, Number(ev.val ?? ev.delta ?? 0));
+    }
+  }
+}
+
+function runSim() {
+  if (!ir) return;
+  const t0 = performance.now();
+  const mind = new MindCore.Mind(ir);
+  mind.engine.solver = cfg.solver || ir.config.solver;
+
+  if (Object.keys(initialOverrides).length) mind.importState({ state: initialOverrides });
+  for (const pn in userParams) mind.setParam(pn, userParams[pn]);
+  for (const tn in persona) mind.setTrait(tn, persona[tn]);
+
+  const dt = mind.engine.dt;
+  const totalMins = Math.round(cfg.days * 1440);
+  const totalSteps = Math.max(1, Math.round(totalMins / dt));
+  const recSteps = Math.max(1, Math.round(cfg.recEvery / dt));
+  const N = Math.floor(totalSteps / recSteps) + 1;
+
+  const evMap = new Map();
+  for (const ev of cfg.events) {
+    const absMin = (+ev.day || 0) * 1440 + tm(ev.time);
+    const stepIdx = Math.round(absMin / dt);
+    if (stepIdx >= 0 && stepIdx <= totalSteps) {
+      if (!evMap.has(stepIdx)) evMap.set(stepIdx, []);
+      evMap.get(stepIdx).push(ev);
+    }
+  }
+
+  const series = {};
+  for (const p of ir.order.leaves) series[p] = new Float32Array(N);
+  const eventMarks = [];
+
+  let sampleIdx = 0;
+  for (let step = 0; step <= totalSteps; step++) {
+    const due = evMap.get(step);
+    if (due) {
+      for (const ev of due) applyEventAction(mind, ev);
+      eventMarks.push(step * dt);
+    }
+
+    const ctx = mind.engine.buildFrame(mind.engine.simTime, mind.engine.state);
+    if (step % recSteps === 0 && sampleIdx < N) {
+      for (const p of ir.order.leaves) series[p][sampleIdx] = ctx[p];
+      sampleIdx++;
+    }
+    if (step < totalSteps) mind.step(ctx);
+  }
+
+  const elapsed = (performance.now() - t0).toFixed(1);
+  simResult = { series, N: sampleIdx, recMin: recSteps * dt, totalMins, eventMarks, mind };
+  document.getElementById('perf-info').textContent =
+    `${totalSteps} steps (${mind.engine.solver}) · ${elapsed} ms`;
+
+  drawAllCharts();
+  setCursor(Math.min(cursorIdx, simResult.N - 1));
+}
+
+const LM = 38, RM = 8, TM = 6, BM = 16;
+function drawChart(v) {
+  if (!simResult || !v.cv) return;
+  const cv = v.cv, w = cv.clientWidth || 600, h = cv.clientHeight || 165, dpr = window.devicePixelRatio || 1;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const activeItems = v.items.filter(it => it.visible && simResult.series[it.path]);
+  let yMin = v.min, yMax = v.max;
+  if (v.ymode === 'unit') { yMin = 0; yMax = 1; }
+  else if (v.ymode === 'signed') { yMin = -1; yMax = 1; }
+  else if (activeItems.length) {
+    let lo = Infinity, hi = -Infinity;
+    for (const it of activeItems) {
+      const arr = simResult.series[it.path];
+      for (let i = 0; i < simResult.N; i++) {
+        if (arr[i] < lo) lo = arr[i];
+        if (arr[i] > hi) hi = arr[i];
+      }
+    }
+    if (isFinite(lo) && isFinite(hi)) {
+      const span = Math.max(0.1, hi - lo);
+      yMin = lo - 0.08 * span;
+      yMax = hi + 0.08 * span;
+    }
+  }
+
+  const pw = w - LM - RM, ph = h - TM - BM, N = simResult.N;
+  const X = i => LM + (i / Math.max(1, N - 1)) * pw;
+  const Y = val => TM + (1 - (val - yMin) / Math.max(1e-6, yMax - yMin)) * ph;
+
+  g.fillStyle = '#0b0e14';
+  g.fillRect(0, 0, w, h);
+
+  if (simResult.series['body.asleep']) {
+    const slp = simResult.series['body.asleep'];
+    g.fillStyle = 'rgba(96, 165, 250, 0.08)';
+    let s0 = -1;
+    for (let i = 0; i < N; i++) {
+      if (slp[i] > 0.5 && s0 < 0) s0 = i;
+      if (slp[i] <= 0.5 && s0 >= 0) { g.fillRect(X(s0), TM, Math.max(1, X(i) - X(s0)), ph); s0 = -1; }
+    }
+    if (s0 >= 0) g.fillRect(X(s0), TM, Math.max(1, X(N - 1) - X(s0)), ph);
+  }
+
+  g.strokeStyle = '#1e2534'; g.fillStyle = '#7c879c'; g.font = '10px ui-monospace, monospace'; g.lineWidth = 1;
+  for (const val of [yMin, (yMin + yMax) / 2, yMax]) {
+    g.beginPath(); g.moveTo(LM, Y(val)); g.lineTo(w - RM, Y(val)); g.stroke();
+    g.fillText(val.toFixed(2), 2, Y(val) + 3);
+  }
+  if (yMin < 0 && yMax > 0) {
+    g.strokeStyle = '#2d374d';
+    g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(LM, Y(0)); g.lineTo(w - RM, Y(0)); g.stroke();
+    g.setLineDash([]);
+  }
+
+  g.strokeStyle = '#1e2534';
+  const samplesPerDay = 1440 / simResult.recMin;
+  for (let d = 0; d <= cfg.days; d++) {
+    const x = X(Math.min(N - 1, d * samplesPerDay));
+    g.beginPath(); g.moveTo(x, TM); g.lineTo(x, TM + ph); g.stroke();
+    if (d < cfg.days) g.fillText(`D${d + 1}`, x + 3, h - 3);
+  }
+
+  g.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+  for (const em of simResult.eventMarks) {
+    const x = X(em / simResult.recMin);
+    g.beginPath(); g.moveTo(x, TM); g.lineTo(x, TM + 8); g.stroke();
+  }
+
+  for (const it of activeItems) {
+    const arr = simResult.series[it.path];
+    const lf = ir.leaves[it.path];
+    g.strokeStyle = colorForPath(it.path);
+    g.lineWidth = lf && lf.kind === 'ode' ? 1.65 : 1.25;
+    if (lf && lf.kind === 'view') g.setLineDash([4, 2]); else g.setLineDash([]);
+    g.beginPath();
+    for (let i = 0; i < N; i++) {
+      const val = Math.max(yMin, Math.min(yMax, arr[i]));
+      const x = X(i), y = Y(val);
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    }
+    g.stroke();
+  }
+  g.setLineDash([]);
+}
+
+function drawAllCharts() { for (const v of chartViews) drawChart(v); }
+
+function setCursor(i) {
+  if (!simResult || !ir) return;
+  cursorIdx = Math.max(0, Math.min(simResult.N - 1, i));
+  const N = simResult.N;
+  for (const v of chartViews) {
+    if (!v.cv || !v.cur) continue;
+    const w = v.cv.clientWidth || 600, pw = w - LM - RM;
+    v.cur.style.display = 'block';
+    v.cur.style.left = (LM + (cursorIdx / Math.max(1, N - 1)) * pw) + 'px';
+  }
+
+  const m = cursorIdx * simResult.recMin;
+  const wallH = simResult.series['env.hour'] ? hh(simResult.series['env.hour'][cursorIdx] * 60) : hh(m);
+  const d = Math.floor(m / 1440);
+  const cycDay = simResult.series['cycle.day'] ? ` · Cycle D${simResult.series['cycle.day'][cursorIdx].toFixed(1)}` : '';
+  document.getElementById('top-cursor-label').textContent = `Day ${d + 1} (${DAYN[d % 7]}) ${wallH}${cycDay} · t = ${m.toFixed(0)}m`;
+
+  const snap = { t: m, dt: ir.config.dt };
+  for (const p of ir.order.leaves) snap[p] = simResult.series[p][cursorIdx];
+  for (const pn of ir.order.params) snap['params.' + pn] = userParams[pn];
+  for (const tn of ir.order.traits) snap['traits.' + tn] = persona[tn];
+
+  const rendered = simResult.mind.renderAll(snap);
+  const pBox = document.getElementById('top-prompts');
+  pBox.innerHTML = '';
+  for (const rname in rendered) pBox.append(el('div', { className: 'prompt-box' }, rendered[rname]));
+
+  const bandLookup = {};
+  for (const rname of ir.order.renders) Object.assign(bandLookup, ir.renders[rname].format || {});
+
+  const chipsHTML = ir.order.leaves.filter(p => ir.leaves[p].visible).map(p => {
+    const lf = ir.leaves[p], val = snap[p];
+    const bword = bandLookup[p] && bandLookup[p].bands ? MindCore.matchBand(val, bandLookup[p].bands) : null;
+    const tip = `${lf.label} (${p})\n${lf.description ? lf.description + '\n' : ''}Eq: ${p}${lf.kind === 'ode' ? "'" : ''} = ${lf.equation}`.replace(/"/g, '&quot;');
+    return `<span class="chip" title="${tip}">${p} <b>${val.toFixed(2)}</b>${bword ? `<span class="w">${bword}</span>` : ''}</span>`;
+  }).join('');
+  document.getElementById('top-chips').innerHTML = chipsHTML;
+}
+
+// ---- Left Sidebar Tabs -----------------------------------------------------
+function renderSimTab() {
+  const root = document.getElementById('tab-sim');
+  root.innerHTML = '';
+  if (!ir) return;
+  const odes = ir.schedule.ode_order;
+
+  root.append(
+    el('h4', null, 'Simulation Horizon & Presets'),
+    el('div', { className: 'row' },
+      el('label', null, 'Days'),
+      el('input', { type: 'number', className: 's', min: 1, max: 60, value: cfg.days, on: { change: e => { cfg.days = Math.max(1, +e.target.value || 5); scheduleRun(); } } }),
+      el('label', null, 'Solver'),
+      el('select', { on: { change: e => { cfg.solver = e.target.value; scheduleRun(); } } },
+        MindCore.SOLVER_NAMES.map(s => el('option', { value: s, selected: cfg.solver === s }, s))
+      ),
+      el('button', { on: { click: () => {
+        cfg.days = 29;
+        cfg.recEvery = 15;
+        if ('menstrual_cycle' in persona) persona.menstrual_cycle = 1.0;
+        if ('luteal_sensitivity' in persona) persona.luteal_sensitivity = 0.5;
+        renderAllTabs(); runSim();
+        setStatus('Activated 29-day Menstrual Cycle simulation');
+      } } }, '🌙 29d Cycle Run')
+    )
+  );
+
+  root.append(
+    el('h4', null, 'External Telemetry & Impulse Palette (@ Cursor Time)'),
+    el('div', { className: 'hint' }, 'Injects external sensor readings (weather, solar kW, GPU/RAM, user presence) or event bundles at the hovered time:')
+  );
+  const trigGrid = el('div', { className: 'trig-grid' });
+  for (const key in EXTERNAL_TRIGGERS) {
+    const tr = EXTERNAL_TRIGGERS[key];
+    const desc = tr.ops.map(o => `${o.op.toUpperCase()} ${o.target}=${o.val}`).join(', ');
+    trigGrid.append(el('button', {
+      className: 'trig-btn', title: desc,
+      on: {
+        click: () => {
+          const curMin = cursorIdx * (simResult ? simResult.recMin : 5);
+          cfg.events.push({ day: Math.floor(curMin / 1440), time: hh(curMin % 1440), kind: 'preset', target: key, val: 1.0 });
+          cfg.events.sort((a, b) => (a.day * 1440 + tm(a.time)) - (b.day * 1440 + tm(b.time)));
+          renderSimTab(); scheduleRun();
+        }
+      }
+    }, tr.label));
+  }
+  root.append(trigGrid);
+
+  // Click-on-Chart Tool selector
+  const clickSelect = el('select', { on: { change: e => { clickMode = e.target.value; } } });
+  const grpPreset = el('optgroup', { label: 'External Telemetry & Event Bundles' });
+  for (const key in EXTERNAL_TRIGGERS) {
+    grpPreset.append(el('option', { value: 'preset:' + key, selected: clickMode === 'preset:' + key }, EXTERNAL_TRIGGERS[key].label));
+  }
+  const grpSet = el('optgroup', { label: 'SET Sensor / ODE Value Directly' });
+  for (const op of odes) {
+    grpSet.append(el('option', { value: 'set:' + op, selected: clickMode === 'set:' + op }, `SET ${op}`));
+  }
+  const grpNudge = el('optgroup', { label: 'NUDGE ODE Leaf (+Delta)' });
+  for (const op of odes) {
+    grpNudge.append(el('option', { value: 'nudge:' + op, selected: clickMode === 'nudge:' + op }, `NUDGE ${op}`));
+  }
+  clickSelect.append(grpPreset, grpSet, grpNudge);
+
+  root.append(
+    el('h4', null, 'Click-on-Chart Action'),
+    el('div', { className: 'row' },
+      clickSelect,
+      el('label', null, 'Val/Δ'),
+      el('input', { type: 'number', className: 't3', step: 0.1, value: clickDelta, on: { change: e => { clickDelta = +e.target.value || 0; } } })
+    )
+  );
+
+  // Scheduled Timeline Table
+  root.append(el('h4', null, `Scheduled Scenario Events (${cfg.events.length})`));
+  const tbl = el('table', null,
+    el('tr', null, ['Day', 'Time', 'Op', 'Target / Bundle', 'Val/Δ', ''].map(h => el('th', null, h)))
+  );
+
+  cfg.events.forEach((ev, idx) => {
+    const kind = ev.kind || ev.op || 'preset';
+    const opts = kind === 'preset'
+      ? Object.keys(EXTERNAL_TRIGGERS).map(k => [k, EXTERNAL_TRIGGERS[k].label])
+      : odes.map(k => [k, k]);
+
+    tbl.append(el('tr', null,
+      el('td', null, el('input', { type: 'number', className: 't3', min: 0, max: 60, value: ev.day, on: { change: e => { ev.day = +e.target.value || 0; scheduleRun(); } } })),
+      el('td', null, el('input', { type: 'text', className: 't5', value: ev.time, on: { change: e => { ev.time = e.target.value; scheduleRun(); } } })),
+      el('td', null, el('select', { on: { change: e => {
+        ev.kind = e.target.value;
+        ev.target = ev.kind === 'preset' ? 'solar_peak' : odes[0];
+        renderSimTab(); scheduleRun();
+      } } }, [['preset', 'Bundle'], ['set', 'SET'], ['nudge', 'NUDGE']].map(o => el('option', { value: o[0], selected: kind === o[0] }, o[1])))),
+      el('td', null, el('select', { on: { change: e => { ev.target = e.target.value; scheduleRun(); } } },
+        opts.map(o => el('option', { value: o[0], selected: ev.target === o[0] }, o[1]))
+      )),
+      el('td', null, el('input', { type: 'number', className: 't3', step: 0.1, value: ev.val ?? ev.delta ?? 1.0, on: { change: e => {
+        ev.val = +e.target.value || 0;
+        scheduleRun();
+      } } })),
+      el('td', null, el('span', { className: 'x', on: { click: () => { cfg.events.splice(idx, 1); renderSimTab(); scheduleRun(); } } }, '×'))
+    ));
+  });
+
+  root.append(tbl,
+    el('div', { className: 'row' },
+      el('button', { on: { click: () => { cfg.events.push({ day: 0, time: '12:00', kind: 'set', target: 'sensors.solar_kw', val: 0.9 }); renderSimTab(); scheduleRun(); } } }, '+ Add Sensor SET'),
+      el('button', { on: { click: () => { cfg.events.push({ day: 0, time: '12:00', kind: 'nudge', target: odes[0], val: 0.5 }); renderSimTab(); scheduleRun(); } } }, '+ Add ODE NUDGE'),
+      el('button', { on: { click: () => { cfg.events = []; renderSimTab(); scheduleRun(); } } }, 'Clear All'),
+      el('button', { on: { click: () => { cfg = defaultScenario(); renderSimTab(); scheduleRun(); } } }, 'Reset Default')
+    )
+  );
+}
+
+function renderPersonaTab() {
+  const root = document.getElementById('tab-persona');
+  root.innerHTML = '';
+  if (!ir) return;
+  root.append(
+    el('div', { className: 'row' },
+      el('button', { on: { click: () => {
+        for (const tn of ir.order.traits) persona[tn] = ir.traits[tn].default;
+        renderPersonaTab(); renderParamsTab(); scheduleRun();
+      } } }, 'Reset Traits to Default'),
+      el('button', { on: { click: exportPersonaFile } }, 'Export persona.json')
+    )
+  );
+
+  let curGrp = '';
+  for (const tn of ir.order.traits) {
+    const tr = ir.traits[tn];
+    if (tr.group !== curGrp) { curGrp = tr.group; root.append(el('div', { className: 'tgrp' }, curGrp)); }
+    const fx = tr.stmts.map(s => `${s.target}${s.is_rate ? "'" : ''} ${s.op} ${s.equation}`).join('\n');
+    const num = el('input', { type: 'number', min: tr.min, max: tr.max, step: 0.05, value: persona[tn] });
+    const rng = el('input', { type: 'range', min: tr.min, max: tr.max, step: 0.05, value: persona[tn] });
+    const set = v => {
+      v = Math.max(tr.min, Math.min(tr.max, parseFloat(v) || 0));
+      persona[tn] = v; num.value = v; rng.value = v;
+      renderParamsTab(); scheduleRun();
+    };
+    rng.addEventListener('input', e => set(e.target.value));
+    num.addEventListener('change', e => set(e.target.value));
+    root.append(el('div', { className: 'trait', title: `${tr.description || tr.label}\n\n${fx}` },
+      el('span', null, tr.label), rng, num
+    ));
+  }
+}
+
+function renderParamsTab() {
+  const root = document.getElementById('tab-params');
+  root.innerHTML = '';
+  if (!ir) return;
+  root.append(el('div', { className: 'row' },
+    el('button', { on: { click: () => {
+      for (const pn of ir.order.params) userParams[pn] = ir.params[pn].default;
+      renderParamsTab(); scheduleRun();
+    } } }, 'Reset All Parameters'),
+    el('span', { className: 'hint' }, 'Green = effective value after active traits')
+  ));
+
+  const tempMind = new MindCore.Mind(ir);
+  for (const pn in userParams) tempMind.setParam(pn, userParams[pn]);
+  for (const tn in persona) tempMind.setTrait(tn, persona[tn]);
+  const snap = tempMind.snapshot();
+
+  const groups = {};
+  for (const pn of ir.order.params) {
+    const p = ir.params[pn];
+    (groups[p.group] = groups[p.group] || []).push(p);
+  }
+  for (const g in groups) {
+    const det = el('details', { open: true }, el('summary', null, g));
+    for (const p of groups[g]) {
+      const effVal = snap['params.' + p.name];
+      const diffTrait = Math.abs(effVal - userParams[p.name]) > 1e-6;
+      const inp = el('input', {
+        type: 'number', step: p.step, value: userParams[p.name],
+        className: userParams[p.name] !== p.default ? 'chg' : '',
+        on: { change: e => {
+          const v = parseFloat(e.target.value);
+          userParams[p.name] = isNaN(v) ? p.default : v;
+          renderParamsTab(); scheduleRun();
+        } }
+      });
+      det.append(el('div', { className: 'prow', title: `${p.name}: ${p.description || p.label}\nDefault: ${p.default} | Used by: ${p.used_by.join(', ') || 'none'}` },
+        el('span', null, p.label, diffTrait ? el('span', { className: 'eff-tag' }, `→ ${effVal.toFixed(2)}`) : null),
+        inp
+      ));
+    }
+    root.append(det);
+  }
+}
+
+function renderSourceTab() {
+  const root = document.getElementById('tab-source');
+  root.innerHTML = '';
+  const ta = el('textarea', { rows: 28, spellcheck: false, value: sourceText });
+  ta.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (compileAndBuild(ta.value, modelOrigin)) {
+        try { localStorage.setItem('mh_last_mind_src', ta.value); } catch (err) {}
+      }
+    }
+  });
+  root.append(
+    el('div', { className: 'row' },
+      el('button', { className: 'pri', on: { click: () => {
+        if (compileAndBuild(ta.value, modelOrigin)) {
+          try { localStorage.setItem('mh_last_mind_src', ta.value); } catch (err) {}
+        }
+      } } }, 'Compile & Apply (Ctrl+Enter)'),
+      el('button', { on: { click: () => triggerImport('mind') } }, 'Import .mind'),
+      el('button', { on: { click: exportMindFile } }, 'Export .mind')
+    ),
+    ta
+  );
+}
+
+function renderIrTab() {
+  const root = document.getElementById('tab-ir');
+  root.innerHTML = '';
+  if (!ir) return;
+  const ta = el('textarea', { rows: 18, spellcheck: false, value: JSON.stringify(ir, null, 2) });
+
+  root.append(
+    el('h4', null, 'Inspect & Edit Handoff JSON Blobs'),
+    el('div', { className: 'row' },
+      el('button', { on: { click: () => { ta.value = JSON.stringify(ir, null, 2); } } }, 'IR v4'),
+      el('button', { on: { click: () => { ta.value = JSON.stringify({ schema: 'mind-hermes-views-v4', views: chartViews.map(v => ({ title: v.title, ymode: v.ymode, min: v.min, max: v.max, items: v.items })) }, null, 2); } } }, 'Graph Views'),
+      el('button', { on: { click: () => { ta.value = JSON.stringify({ schema: 'mind-hermes-persona-v4', traits: persona, params: userParams }, null, 2); } } }, 'Persona'),
+      el('button', { on: { click: () => { ta.value = JSON.stringify({ schema: 'mind-hermes-scenario-v4', days: cfg.days, recEvery: cfg.recEvery, solver: cfg.solver, initial: initialOverrides, traits: persona, params: userParams, events: cfg.events }, null, 2); } } }, 'Scenario')
+    ),
+    el('div', { className: 'row' },
+      el('button', { className: 'pri', on: { click: () => handleImportedText('editor.json', ta.value) } }, 'Apply JSON from Box')
+    ),
+    ta
+  );
+}
+
+function renderAllTabs() {
+  renderSimTab();
+  renderPersonaTab();
+  renderParamsTab();
+  renderSourceTab();
+  renderIrTab();
+}
+
+window.showTab = function (name) {
+  for (const t of ['sim', 'persona', 'params', 'source', 'ir']) {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+    document.getElementById('btn-' + t).classList.toggle('on', t === name);
+  }
+};
+
+async function fetchDiskModel() {
+  if (window.__MIND_INLINE_MODEL) {
+    modelOrigin = 'model/model.mind';
+    if (compileAndBuild(window.__MIND_INLINE_MODEL, modelOrigin)) {
+      try { localStorage.setItem('mh_last_mind_src', window.__MIND_INLINE_MODEL); } catch (e) {}
+      setStatus('Loaded inline model (plugin-served)');
+      return true;
+    }
+    sourceText = window.__MIND_INLINE_MODEL;
+    renderSourceTab();
+    return false;
+  }
+  for (const url of ['../model/model.mind', './model.mind', '/model/model.mind']) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (res.ok) {
+        const txt = await res.text();
+        modelOrigin = 'model/model.mind';
+        if (compileAndBuild(txt, modelOrigin)) {
+          try { localStorage.setItem('mh_last_mind_src', txt); } catch (e) {}
+          setStatus(`Loaded ${url}`);
+          return true;
+        }
+        sourceText = txt;
+        renderSourceTab();
+        return false;
+      }
+    } catch (e) {}
+  }
+  const cached = localStorage.getItem('mh_last_mind_src');
+  if (cached) {
+    modelOrigin = localStorage.getItem('mh_last_mind_origin') || 'model/model.mind';
+    compileAndBuild(cached, modelOrigin);
+    setStatus('Loaded cached .mind from localStorage');
+    return true;
+  }
+  showTab('source');
+  showError('No model loaded yet — click "1. Model (.mind) -> Import" above or drop model.mind onto the page.');
+  return false;
+}
+
+window.addEventListener('load', () => {
+  fetchDiskModel();
+
+  document.getElementById('file-picker').addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => handleImportedText(f.name, String(rd.result), activeImportKind);
+    rd.readAsText(f);
+    e.target.value = '';
+  });
+
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    e.preventDefault();
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => handleImportedText(f.name, String(rd.result), null);
+    rd.readAsText(f);
+  });
+
+  const ch = document.getElementById('charts');
+  ch.addEventListener('mousemove', e => {
+    const w = e.target.closest('.cw');
+    if (!w || !simResult) return;
+    const r = w.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (e.clientX - r.left - LM) / Math.max(1, r.width - LM - RM)));
+    setCursor(Math.round(f * (simResult.N - 1)));
+  });
+  ch.addEventListener('click', e => {
+    const w = e.target.closest('.cw');
+    if (!w || !simResult) return;
+    const r = w.getBoundingClientRect();
+    const f = Math.max(0, Math.min(1, (e.clientX - r.left - LM) / Math.max(1, r.width - LM - RM)));
+    const totalMin = Math.round(f * simResult.totalMins);
+    const [kind, target] = clickMode.split(':');
+    cfg.events.push({ day: Math.floor(totalMin / 1440), time: hh(totalMin % 1440), kind, target, val: clickDelta });
+    cfg.events.sort((a, b) => (a.day * 1440 + tm(a.time)) - (b.day * 1440 + tm(b.time)));
+    renderSimTab();
+    runSim();
+  });
+  window.addEventListener('resize', drawAllCharts);
+});
+</script>
+</body>
+</html>
